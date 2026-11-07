@@ -1,0 +1,23 @@
+.token-inspector{color:#e6dfc7}
+.token-tray{
+  position:relative;isolation:isolate;display:grid;place-items:center;overflow:hidden;
+  border:1px solid #4b4c3c;background-color:#292b23;
+  background-image:radial-gradient(ellipse at 48% 35%,#42433880 0%,#11140f80 80%),
+    repeating-linear-gradient(1deg,transparent 0 3px,#8d8e7610 3px 4px);
+}
+.token-tray::before{
+  content:"";position:absolute;width:37%;height:7%;bottom:8%;z-index:-1;
+  border-radius:50%;background:#100f09bb;filter:blur(7px);
+}
+.token-object{
+  display:block;width:min(65%,228px);height:auto;aspect-ratio:1;
+  touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;
+}
+.token-object:active{cursor:grabbing}
+.token-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 0}
+.token-controls>div{min-width:0}
+.token-side,.token-instruction{display:block;line-height:1.4}
+.token-side{font-weight:600;font-size:14px}
+.token-instruction{font-size:12px;color:var(--muted);margin-top:3px}
+.token-controls .token-flip{flex:none;font-size:13px;min-height:44px;padding:0 13px}
+@media(max-height:600px){.token-object{width:min(55%,154px)}}

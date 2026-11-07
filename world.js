@@ -1,5 +1,6 @@
 import * as THREE from './vendor/three.module.min.js';
 import {buildFacility, buildWatcher, CELL, layoutFor, releaseScene} from './assets/world/facility.js';
+import {gateBlocks, POST} from './assets/world/checkpoint.js';
 import {softwareView} from './assets/world/software-view.js';
 
 const EYE_HEIGHT = 1.62;
@@ -57,7 +58,7 @@ export function createWorld(container, callbacks = {}) {
   let life = 'idle', layout, facility, watcher;
   let collected = false, flashlight = true, focus = null;
   let sensitivity = 1, walkTime = 0, stepTime = 0, roomTime = 0, frame = 0, previousTime = 0;
-  let hazardTime = 0, hazardPhase = 'idle', nextHazard = 38, patrolLength = 0;
+  let hazardTime = 0, hazardPhase = 'idle', nextHazard = 38, patrolOrigin = 0, patrolLength = 0;
   let mouseDown = false, wasLocked = false, ignoreUnlock = false, disposed = false;
   let lastSize = '';
   const events = new AbortController();
@@ -155,7 +156,7 @@ export function createWorld(container, callbacks = {}) {
     for (const o of facility.obstacles) {
       if (Math.abs(x - o.x) < o.w + BODY_RADIUS && Math.abs(z - o.z) < o.d + BODY_RADIUS) return false;
     }
-    return true;
+    return !facility.checkpoint || !gateBlocks(x, z, facility.checkpoint.progress, BODY_RADIUS);
   }
   function visibleThroughCells(x, z) {
     const pos = camera.position;
@@ -175,7 +176,7 @@ export function createWorld(container, callbacks = {}) {
     let best = null, bestScore = -Infinity;
     for (const [kind, p] of Object.entries(layout.points)) {
       if (kind === 'item' && collected) continue;
-      const y = kind === 'item' ? 1.09 : 1.36;
+      const y = p.y ?? (kind === 'item' ? 1.09 : 1.36);
       targetDir.set(p.x - camera.position.x, y - camera.position.y, p.z - camera.position.z);
       const distance = targetDir.length();
       if (distance > 2.9 || distance < .05) continue;
@@ -214,6 +215,18 @@ export function createWorld(container, callbacks = {}) {
       pos.y += (EYE_HEIGHT - pos.y) * Math.min(1, 12 * dt);
     }
   }
+  function updateGate(dt) {
+    const gate = facility.checkpoint;
+    if (!gate?.active || gate.progress >= 1) return;
+    const before = gate.progress;
+    gate.setProgress(Math.min(1, before + dt / 1.2));
+    if (before < .58 && gate.progress >= .58) {
+      const dx = POST.phone.x - camera.position.x, dz = POST.phone.z - camera.position.z;
+      const dy = POST.phone.y - camera.position.y, yaw = camera.rotation.y;
+      const distance = Math.hypot(dx, dy, dz);
+      callbacks.onPhoneRing?.((dx * Math.cos(yaw) - dz * Math.sin(yaw)) / distance, distance);
+    }
+  }
   function updateHazard(dt) {
     hazardTime += dt;
     if (hazardPhase === 'idle' && hazardTime >= nextHazard) {
@@ -223,7 +236,7 @@ export function createWorld(container, callbacks = {}) {
       hazardPhase = 'patrol'; hazardTime = 0;
       watcher.group.visible = true;
     } else if (hazardPhase === 'patrol') {
-      const z = -layout.end * CELL + hazardTime * 2.05;
+      const z = patrolOrigin + hazardTime * 2.05;
       watcher.group.position.set(Math.sin(hazardTime * 1.8) * .065, .016 * Math.sin(hazardTime * 4), z);
       for (const {pivot, sign} of watcher.limbs) pivot.rotation.x = sign * .29 * Math.sin(hazardTime * 4);
       warningLight.position.set(0, 2.54, z + .2);
@@ -265,7 +278,7 @@ export function createWorld(container, callbacks = {}) {
     const steps = Math.max(1, Math.ceil(dt / .045));
     roomTime += dt;
     for (let i = 0; i < steps && life === 'running'; i++) {
-      move(dt / steps); updateHazard(dt / steps);
+      updateGate(dt / steps); move(dt / steps); updateHazard(dt / steps);
     }
     slowFrames = elapsed > .065 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
     if (renderer && slowFrames >= 6 && renderScale > .41) {
@@ -303,14 +316,27 @@ export function createWorld(container, callbacks = {}) {
     const fog = new THREE.Color(0x262a24);
     scene.background = fog; scene.fog = new THREE.FogExp2(fog, .053);
     for (const light of fixtures) light.color.set(facility.colors[4]);
-    camera.position.set(0, EYE_HEIGHT, .78); camera.rotation.set(-.012, 0, 0, 'YXZ');
+    camera.position.set(0, EYE_HEIGHT, mission.id === 2 ? POST.spawnZ : .78); camera.rotation.set(-.012, 0, 0, 'YXZ');
     collected = false; walkTime = 0; stepTime = .28; roomTime = 0;
     hazardTime = 0; hazardPhase = 'idle'; warningLight.intensity = 0;
-    nextHazard = 43 - layout.chapter; patrolLength = (layout.end * CELL + 1.75) / 2.05;
+    patrolOrigin = layout.opening ? POST.spawnZ + 1.85 : -layout.end * CELL;
+    nextHazard = 43 - layout.chapter; patrolLength = (1.75 - patrolOrigin) / 2.05;
     setFocus(null); updateLights(); render(); resume();
   }
+  function advanceToClock(mission) {
+    if (disposed || layout?.id !== 1 || mission.id !== 2) return;
+    layout = layoutFor(2);
+    collected = false; facility.item.visible = false;
+    facility.checkpoint.active = true;
+    facility.checkpoint.setProgress(0);
+    // The latch and telephone are one audible beat. Begin the next patrol on
+    // the entry side after the player has had time to cross into the booth.
+    watcher.group.visible = false; warningLight.intensity = 0;
+    hazardPhase = 'idle'; hazardTime = 0; nextHazard = 43;
+    setFocus(null);
+  }
   return {
-    start, pause, resume,
+    start, advanceToClock, pause, resume,
     interact() {
       if (life !== 'running') return null;
       updateFocus();
@@ -320,7 +346,10 @@ export function createWorld(container, callbacks = {}) {
     },
     setCollected(value) {
       collected = !!value;
-      if (facility) facility.item.visible = !collected;
+      if (facility) {
+        const item = layout.id === 2 ? facility.checkpoint.looseHand : facility.item;
+        item.visible = !collected;
+      }
       if (focus === 'item' && collected) setFocus(null);
     },
     setFlashlight(value) { flashlight = !!value; beam.visible = flashlight; },
@@ -328,6 +357,16 @@ export function createWorld(container, callbacks = {}) {
     setMove(x, forward) { manualMove.set(between(x, -1, 1), between(forward, -1, 1)); },
     getLocations() {
       if (!layout) return {};
+      if (layout.id === 1) return {
+        item: 'Приёмная, стол слева от центрального коридора',
+        clue: 'Табличка слева у турникета № 2',
+        station: 'Приёмник жетонов справа у турникета № 2',
+      };
+      if (layout.id === 2) return {
+        item: 'Будка за турникетом, рабочий стол слева',
+        clue: 'Самописец на правом столе в будке',
+        station: 'Табельные часы в глубине будки, рядом с телефоном',
+      };
       return {item: layout.rooms[layout.itemRoom].title, clue: layout.rooms[layout.clueRoom].title, station: 'Пост в торце центрального коридора'};
     },
     dispose() {

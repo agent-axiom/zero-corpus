@@ -119,6 +119,13 @@
 .kontur-instrument .inst-outlets .inst-key::before {content: ''; width: 10px; height: 10px; border: 2px solid #aaa087; border-radius: 50%; background: #1a1b16}
 .kontur-instrument .inst-outlets .inst-key[aria-pressed=true] {border-color: var(--inst-warm); background: #514332}
 .kontur-instrument .inst-outlets .inst-key[aria-pressed=true]::before {background: var(--inst-warm)}
+.kontur-instrument .inst-token-slots {margin: 0; gap: 4px}
+.kontur-instrument .inst-token-slots .inst-key {min-height: 74px; gap: 12px; margin: 0; padding: 9px 2px}
+.kontur-instrument .inst-token-slots .inst-key::before {
+  width: min(38px, 70%); height: 5px; border: 2px solid #71694f; border-bottom-color: #9f9574;
+  border-radius: 2px; background: #11130f; box-shadow: inset 1px 2px 2px #060704;
+}
+.kontur-instrument .inst-token-slots .inst-key[aria-pressed=true]::before {background: #c39a59}
 @media (pointer: coarse) {
   .kontur-instrument .inst-key, .kontur-instrument .inst-drum .inst-key, .kontur-instrument .inst-edit .inst-key {min-height: 44px}
 }

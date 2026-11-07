@@ -1,5 +1,6 @@
 // A low-resolution raycast view also runs on devices without a WebGL 2 context.
 import {CELL, HEIGHT} from './facility.js';
+import {gateAngle, POST} from './checkpoint.js';
 
 function shade(rgb, light) {
   const word = Math.min(255, rgb[0] * light) | (Math.min(255, rgb[1] * light) << 8) | (Math.min(255, rgb[2] * light) << 16);
@@ -94,12 +95,12 @@ export function softwareView(canvas) {
       if (d < .20) return null;
       return {cx: w / 2 + (dx * cs - dz * sn) * f / d, scale: f / d, d};
     }
-    function sprite(x, y, z, width, height, color, label = '') {
+    function sprite(x, y, z, width, height, color, label = '', face = null, dim = 0) {
       const p = project(x, z);
       if (!p) return;
       const top = horizon - (y + height - eye.y) * p.scale;
       sprites.push({x: p.cx - width * p.scale / 2, y: top, w: width * p.scale,
-        h: height * p.scale, d: p.d, color, label});
+        h: height * p.scale, d: p.d, color, label, face, dim});
     }
     for (const room of layout.rooms) {
       const x = room.side * .99, z = -(room.row - .50) * CELL;
@@ -108,14 +109,63 @@ export function softwareView(canvas) {
     }
     for (const o of facility.obstacles) {
       const isTable = Object.values(layout.points).some(p => Math.hypot(p.x - o.x, p.z - o.z) < .85);
-      if (isTable) continue;
+      const reception = layout.opening && o.x === layout.rooms[0].x && o.z === layout.rooms[0].z;
+      if (isTable || reception || o.checkpoint) continue;
       const tall = Math.max(o.w, o.d) >= .57;
       const width = Math.max(.45, o.w * 1.7 + o.d * .55);
       sprite(o.x, .03, o.z, width, tall ? 1.65 : .60, tall ? '#485348' : '#686450');
       sprite(o.x, tall ? 1.22 : .59, o.z, width * .5, .09, '#8c8b70');
     }
     for (const lamp of facility.lights) sprite(lamp.x, HEIGHT - .09, lamp.z, 1.4, .085, '#d7cc9d');
-    for (const kind of ['item', 'clue', 'station']) {
+    const checkpoint = facility.checkpoint;
+    if (checkpoint) {
+      const {gateZ, hingeX, span, plate, reader, hand, tape, clock, phone} = POST;
+      const angle = gateAngle(checkpoint.progress);
+      for (const y of [.54, 1.05]) {
+        for (let d = .04; d < span; d += .08) {
+          sprite(hingeX + d * Math.cos(angle), y, gateZ - d * Math.sin(angle), .115, .068, '#a5a58e');
+        }
+      }
+      for (const d of [.06, span - .08]) sprite(hingeX + d * Math.cos(angle), .54,
+        gateZ - d * Math.sin(angle), .068, .53, '#7b8473');
+      sprite(hingeX + span * .5 * Math.cos(angle), .71, gateZ - span * .5 * Math.sin(angle),
+        .35, .17, '#9f8652');
+      for (const side of [-1, 1]) {
+        for (const d of [.65, 1.70]) sprite(side * d, .03, gateZ, .1, 1.18, '#929885');
+        for (const y of [.54, 1.05]) sprite(side * 1.24, y, gateZ, 1.17, .064, '#727b6b');
+        sprite(side * 1.63, .02, -31.02, .13, 2.69, '#596654');
+      }
+      sprite(0, 2.67, -31.02, 3.30, .29, '#3e4b41', 'БУДКА ДЕЖУРНОГО');
+      sprite(.65, 2.42, gateZ, 1.32, .43, '#354437', 'ТУРНИКЕТ № 2');
+      sprite(plate.x, .02, plate.z - .08, .085, 1.81, '#6c7869');
+      sprite(plate.x, plate.y - .39, plate.z, 1.03, .78, '#3b493d', '', checkpoint.plateFace.map.image);
+      sprite(reader.x, .03, reader.z - .10, .34, 1.11, '#596557');
+      sprite(reader.x, 1.14, reader.z - .04, .42, .25, '#41473b', 'ЖЕТОН');
+      sprite(reader.x + .14, 1.24, reader.z + .02, .035, .042, checkpoint.active ? '#afde89' : '#ee673a');
+      const desk = layout.rooms[0];
+      for (const point of [desk, hand, tape]) {
+        sprite(point.x, .04, point.z, 1.39, .87, '#485348');
+        sprite(point.x, .89, point.z, 1.65, .12, '#8b8975');
+      }
+      if (layout.id === 1 && !collected) sprite(desk.x, 1.005, desk.z, .27, .1, '#d6aa69');
+      sprite(hand.x, .99, hand.z + .01, .65, .068, '#756346');
+      if (checkpoint.looseHand.visible) {
+        sprite(hand.x, 1.052, hand.z + .02, .44, .055, '#c0c1a7');
+        sprite(hand.x - .15, 1.046, hand.z + .03, .11, .077, '#a1a593');
+      }
+      sprite(tape.x, 1.02, tape.z - .08, .83, .47, '#596557');
+      sprite(tape.x, tape.y - .19, tape.z + .11, .73, .38, '#c8c3a2', '', checkpoint.slip.map.image);
+      sprite(clock.x, .02, clock.z - .12, 3.18, 1.02, '#535f51');
+      sprite(clock.x, 1.03, clock.z - .12, 3.28, .08, '#8a8871');
+      sprite(clock.x, 1.10, clock.z - .09, .90, 1.15, '#42483c');
+      if (checkpoint.progress >= .58) sprite(clock.x, 1.40, clock.z + .04, .84, .84,
+        checkpoint.pulse > .3 ? '#ffda90' : '#c8b080');
+      sprite(clock.x, clock.y - .40, clock.z + .07, .8, .8, '#c5bc9d', '', checkpoint.dial.map.image, checkpoint.progress < .58 ? .42 : 0);
+      sprite(phone.x, 1.09, phone.z, .47, .13, '#242b24');
+      sprite(phone.x, 1.29, phone.z - .075, .45, .08, '#1d241e');
+      for (const side of [-1, 1]) sprite(phone.x + side * .19, 1.22, phone.z - .05, .14, .115, '#202820');
+      for (const z of [-29.95, -30.75, -31.55, -32.35]) sprite(0, .01, z, .10, .035, '#a48e60');
+    } else for (const kind of ['item', 'clue', 'station']) {
       const p = layout.points[kind];
       const width = kind === 'station' ? 1.30 : 1.65;
       sprite(p.x, .04, p.z, width * .84, .86, '#414941');
@@ -136,7 +186,19 @@ export function softwareView(canvas) {
     for (const s of sprites) {
       const first = Math.max(0, Math.floor(s.x)), last = Math.min(w, Math.ceil(s.x + s.w));
       ctx.fillStyle = s.color;
-      for (let i = first; i < last; i++) if (depths[i] + .03 > s.d) ctx.fillRect(i, s.y, 1, s.h);
+      for (let i = first; i < last;) {
+        if (depths[i] + .03 <= s.d) { i++; continue; }
+        const begin = i++;
+        while (i < last && depths[i] + .03 > s.d) i++;
+        if (s.face) {
+          ctx.save(); ctx.beginPath(); ctx.rect(begin, s.y, i - begin, s.h); ctx.clip();
+          ctx.drawImage(s.face, s.x, s.y, s.w, s.h);
+          if (s.dim) {
+            ctx.fillStyle = 'rgba(25,28,22,' + s.dim + ')'; ctx.fillRect(s.x, s.y, s.w, s.h);
+          }
+          ctx.restore();
+        } else ctx.fillRect(begin, s.y, i - begin, s.h);
+      }
       const center = Math.round(s.x + s.w / 2);
       if (s.label && s.w >= 22 && center >= 0 && center < w && depths[center] + .03 > s.d) {
         ctx.font = 'bold ' + Math.max(4, Math.round(s.h * .47)) + 'px monospace';

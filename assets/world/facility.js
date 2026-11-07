@@ -1,4 +1,5 @@
 import * as THREE from '../../vendor/three.module.min.js';
+import {buildCheckpoint, POST} from './checkpoint.js';
 import {labelMaterial, makeSurfaces, palettes, randomSource} from './surfaces.js';
 
 export const CELL = 3.65;
@@ -45,7 +46,10 @@ export function layoutFor(id) {
     for (let r = 3; r <= 7; r++) put(side * 2, r);
   }
 
-  const itemRoom = (id - 1) % rooms.length;
+  const opening = id === 1 || id === 2;
+  if (opening) for (const row of [9, 10]) for (const side of [-1, 1]) put(side, row);
+
+  const itemRoom = opening ? 0 : (id - 1) % rooms.length;
   const clueRoom = (itemRoom + 1 + Math.floor((id - 1) / 4) % 3) % rooms.length;
   const point = room => ({x: room.x, z: room.z, yaw: room.rot});
   const points = {
@@ -53,7 +57,9 @@ export function layoutFor(id) {
     clue: point(rooms[clueRoom]),
     station: {x: 0, z: -end * CELL - .22, yaw: 0},
   };
-  return {chapter, cells, end, rooms, itemRoom, clueRoom, points,
+  if (id === 1) Object.assign(points, {clue: POST.plate, station: POST.reader});
+  if (id === 2) Object.assign(points, {item: POST.hand, clue: POST.tape, station: POST.clock});
+  return {id, opening, chapter, cells, end, rooms, itemRoom, clueRoom, points,
     has(x, r) {return cells.has(key(x, r));},
     inside(x, z) {return cells.has(key(Math.floor(x / CELL + .5), Math.floor(-z / CELL + .5)));},
   };
@@ -73,7 +79,7 @@ export function releaseScene(group) {
   for (const item of [...textures, ...materials, ...geometries]) item.dispose();
 }
 
-function itemModel(title, material) {
+function itemModel(title, material, stamped = false) {
   const group = new THREE.Group();
   const block = (m, x, y, z, w, h, d) => {
     const obj = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
@@ -90,7 +96,16 @@ function itemModel(title, material) {
   if (/жетон|монет|шайб/.test(t)) {
     disk(material.rust, 0, .025, 0, .14, .050);
     disk(material.amber, 0, .055, 0, .115, .012);
-    block(material.darkPaper, 0, .066, 0, .12, .005, .014);
+    if (stamped) {
+      // The institute stamp faces up. Only the reverse carries the route mark.
+      for (let i = 0; i < 3; i++) {
+        const a = i * Math.PI * 2 / 3;
+        const edge = new THREE.Mesh(new THREE.BoxGeometry(.088, .005, .009), material.darkPaper);
+        edge.position.set(Math.sin(a) * .027, .066, Math.cos(a) * .027);
+        edge.rotation.y = a;
+        group.add(edge);
+      }
+    } else block(material.darkPaper, 0, .066, 0, .12, .005, .014);
   } else if (/ключ|пломб|пропуск|карт[ауыо]|талон|билет/.test(t)) {
     block(material.dark, 0, .02, 0, .39, .04, .24);
     block(material.amber, -.11, .045, 0, .073, .012, .2);
@@ -118,7 +133,7 @@ export function buildFacility(mission, layout) {
   const group = new THREE.Group();
   const colors = palettes[layout.chapter];
   const mat = makeSurfaces(colors, layout.chapter);
-  const rand = randomSource(mission.id * 37 + 51);
+  const rand = randomSource((layout.opening ? 1 : mission.id) * 37 + 51);
   const box = new THREE.BoxGeometry(1, 1, 1);
   const round = new THREE.CylinderGeometry(.5, .5, 1, 10);
   const plane = new THREE.PlaneGeometry(1, 1);
@@ -337,7 +352,7 @@ export function buildFacility(mission, layout) {
     lamp(side * (span - .3) * CELL, z, 1.35);
     at(x, z, rot, () => {
       const back = -CELL * .35 + .09;
-      const hasFireDoor = i !== layout.itemRoom && i !== layout.clueRoom;
+      const hasFireDoor = i !== layout.itemRoom && (layout.opening || i !== layout.clueRoom);
       const frameHeight = 2.32;
       const signHeight = .57;
       const signY = hasFireDoor ? frameHeight + .10 + signHeight / 2 : 2.28;
@@ -391,13 +406,23 @@ export function buildFacility(mission, layout) {
     });
   }
 
-  const item = itemModel(mission.item, mat);
-  item.position.set(layout.points.item.x, .995, layout.points.item.z);
-  item.rotation.y = layout.points.item.yaw - .18;
+  const item = itemModel(layout.opening ? 'Жетон' : mission.item, mat, layout.opening);
+  const itemDesk = layout.rooms[layout.itemRoom];
+  item.position.set(itemDesk.x, .995, itemDesk.z);
+  item.rotation.y = itemDesk.rot - .18;
+  item.visible = mission.id !== 2;
   group.add(item);
 
   const station = layout.points.station;
-  at(station.x, station.z, 0, () => {
+  let checkpoint = null;
+  if (layout.opening) {
+    const firstProp = obstacles.length;
+    checkpoint = buildCheckpoint({group, mat, box, round, plane, block, mesh, sign, solid, lamp, at, table});
+    // These fixtures have their own silhouettes in the raycast renderer.
+    for (let i = firstProp; i < obstacles.length; i++) obstacles[i].checkpoint = true;
+    checkpoint.active = mission.id === 2;
+    checkpoint.setProgress(checkpoint.active ? 1 : 0);
+  } else at(station.x, station.z, 0, () => {
     const stationName = String(mission.station || 'Контроль');
     if (/турникет/.test(stationName.toLowerCase())) {
       // An old tripod turnstile still stands across the entry checkpoint.
@@ -478,7 +503,7 @@ export function buildFacility(mission, layout) {
     instance.computeBoundingSphere();
     group.add(instance);
   }
-  return {group, item, obstacles, lights, colors, mat};
+  return {group, item, obstacles, lights, colors, mat, checkpoint};
 }
 
 export function buildWatcher(materials) {

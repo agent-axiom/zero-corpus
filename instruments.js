@@ -159,26 +159,34 @@ function sequencer(panel, mission, separator) {
 
 function patchboard(panel, mission, inlet) {
   let selected = -1;
-  const source = el('span', 'inst-inlet', inlet);
-  const diagram = el('div', 'inst-junction');
+  const isGate = mission.id === 1;
   const outlets = el('div', 'inst-outlets');
+  let diagram;
+  if (isGate) {
+    outlets.classList.add('inst-token-slots');
+  } else {
+    diagram = el('div', 'inst-junction');
+    const route = el('span', 'inst-wire');
+    route.setAttribute('aria-hidden', 'true');
+    diagram.append(el('span', 'inst-inlet', inlet), route);
+    panel.append(diagram);
+  }
   const keys = mission.options.map((name, index) => {
     const key = button(name, () => {
       selected = index;
       keys.forEach((key, i) => key.setAttribute('aria-pressed', String(i === index)));
-      diagram.style.setProperty('--route', ((index + 0.5) * 100 / keys.length) + '%');
-      diagram.classList.add('inst-patched');
+      if (diagram) {
+        diagram.style.setProperty('--route', ((index + 0.5) * 100 / keys.length) + '%');
+        diagram.classList.add('inst-patched');
+      }
     });
     key.setAttribute('aria-pressed', 'false');
     return key;
   });
   outlets.style.gridTemplateColumns = 'repeat(' + keys.length + ', minmax(0, 1fr))';
-  const route = el('span', 'inst-wire');
-  route.setAttribute('aria-hidden', 'true');
-  diagram.append(source, route);
   outlets.append(...keys);
-  panel.append(diagram, outlets);
-  return {label: 'Коммутационная панель', get: () => selected};
+  panel.append(outlets);
+  return {label: isGate ? 'Жетоноприёмник' : 'Коммутационная панель', get: () => selected};
 }
 
 export function mountInstrument(container, mission, onSubmit) {
@@ -204,9 +212,11 @@ export function mountInstrument(container, mission, onSubmit) {
   const footer = el('div', 'inst-footer');
   const lamp = el('span', 'inst-lamp', 'Ожидание');
   lamp.setAttribute('role', 'status');
-  const confirm = button('Подтвердить', () => {
-    const accepted = onSubmit(device.get());
+  const confirm = button(id === 1 ? 'Вставить жетон' : 'Подтвердить', () => {
+    const selection = device.get();
+    const accepted = onSubmit(selection);
     lamp.textContent = accepted ? 'Принято' : 'Нет контакта';
+    if (!accepted && id === 1) lamp.textContent = selection < 0 ? 'Ожидание' : 'Жетон возвращён';
     lamp.classList.toggle('inst-ok', accepted);
     lamp.classList.toggle('inst-bad', !accepted);
   });

@@ -1,6 +1,7 @@
 import {chapters, missions} from './campaign.js';
 import {createAudio} from './audio.js';
 import {mountInstrument} from './instruments.js';
+import {mountToken} from './token.js';
 
 const $ = selector => document.querySelector(selector);
 const icon = name => '<svg aria-hidden="true"><use href="#i-' + name + '"/></svg>';
@@ -14,7 +15,10 @@ function write(key, value) { try { localStorage.setItem(key, JSON.stringify(valu
 const raw = read(saveKey), cfg = read(settingsKey);
 const state = {
   completed: Math.floor(range(raw.completed, 0, missions.length, 0)),
-  collected: raw.collected === true, read: raw.read === true, started: raw.started === true
+  collected: raw.collected === true, read: raw.read === true, started: raw.started === true,
+  // The original plaque explicitly told the player which mark was on the token.
+  tokenInspected: raw.completed === 0 && raw.collected === true &&
+    (raw.tokenInspected === true || (raw.tokenInspected === undefined && raw.read === true))
 };
 const settings = {sound: cfg.sound !== false, volume: range(cfg.volume, 0, 1, .6), sensitivity: range(cfg.sensitivity, .3, 2, 1), grain: cfg.grain !== false};
 const audio = createAudio();
@@ -49,6 +53,7 @@ function clock() {
 function clearSheet() {
   onDismiss = null; overlay = '';
   if (dialog.open) dialog.close();
+  body.replaceChildren();
 }
 function dismiss() {
   const next = onDismiss;
@@ -73,20 +78,34 @@ function notice(message, ms = 4400) {
 }
 function focusOn(kind) {
   const m = current();
-  const label = {item: m.item, clue: state.read ? 'Перечитать улику' : 'Изучить улику', station: m.station}[kind];
+  const clueName = m.id === 1 ? 'Прочитать табличку' : m.id === 2 ? 'Прочитать контрольную ленту' : state.read ? 'Перечитать улику' : 'Изучить улику';
+  const label = {item: m.item, clue: clueName, station: m.station}[kind];
   $('#focus-hint').hidden = !label; $('#focus-hint span').textContent = label || '';
   $('#game').classList.toggle('focused', Boolean(label));
 }
+function objectiveFor(m) {
+  if (m.id === 1) {
+    if (!state.collected) return 'Найти жетон в приёмной';
+    if (!state.tokenInspected) return 'Осмотреть оборот жетона в журнале';
+    if (!state.read) return 'Прочитать табличку у турникета';
+    return 'Вставить жетон в подходящий приёмник';
+  }
+  if (m.id === 2) {
+    if (!state.collected) return 'Найти стрелку в будке за турникетом';
+    if (!state.read) return 'Изучить контрольную ленту в будке';
+    return 'Выставить время на табельных часах';
+  }
+  return !state.collected ? 'Найти предмет · ' + m.item : !state.read ? 'Отыскать и изучить улику' : 'Использовать предмет · ' + m.station;
+}
 function updateHud() {
-  const m = current();
-  const objective = !state.collected ? 'Найти предмет · ' + m.item : !state.read ? 'Отыскать и изучить улику' : 'Использовать предмет · ' + m.station;
+  const m = current(), objective = objectiveFor(m);
   $('#objective').innerHTML = '<small class="micro">МИССИЯ ' + pad(m.id) + ' / ' + escape(chapterOf(m).title.toUpperCase()) + '</small><strong>' + escape(m.title) + '</strong><span>' + escape(objective) + '</span>';
   $('#light-state').textContent = light ? 'Свет вкл.' : 'Свет выкл.';
 }
 function pauseWorld() { if (playing) world?.pause(); }
 function resumeWorld() {
   if (!playing || failure || finished()) return;
-  clearSheet(); world.resume(); updateHud();
+  clearSheet(); audio.unlock(); world.resume(); updateHud();
 }
 function returnHome() {
   playing = false; failure = false; clearSheet(); world?.pause(); focusOn(null); notice('');
@@ -105,7 +124,11 @@ async function launch() {
         onInteract: interact, onFocus: focusOn,
         onThreat: message => { if (playing && message) { if (message.startsWith('Шаги стихли')) audio.signal(); else audio.threat(); notice(message, 6200); } },
         onFail: lost, onPause: () => { if (playing && !dialog.open && !failure) pauseMenu(); },
-        onMove: () => audio.step()
+        onMove: () => audio.step(),
+        onPhoneRing: (pan, distance) => {
+          audio.phoneRing(pan, distance);
+          notice('За турникетом один раз звонит телефон. В будке загораются часы.', 4200);
+        }
       });
     }
     const firstVisit = !state.started;
@@ -114,7 +137,8 @@ async function launch() {
     world.setSensitivity(settings.sensitivity); world.start(current());
     world.setCollected(state.collected); world.setClueRead?.(state.read); world.setFlashlight(light);
     audio.inWorld(true); state.started = true; save(); updateHud();
-    notice(firstVisit ? (matchMedia('(pointer:coarse)').matches ? 'Слева — ходьба, справа — обзор. Цель и записи доступны в журнале.' : 'WASD — ходьба · Щёлкните в сцене для обзора · E — осмотреть · J — журнал') : 'Полевой журнал восстановлен', firstVisit ? 7500 : 2400);
+    if (current().id === 2) notice('Турникет открыт. Часы горят в будке за ним.', 3900);
+    else notice(firstVisit ? (matchMedia('(pointer:coarse)').matches ? 'Слева — ходьба, справа — обзор. Цель и записи доступны в журнале.' : 'WASD — ходьба · Щёлкните в сцене для обзора · E — осмотреть · J — журнал') : 'Полевой журнал восстановлен', firstVisit ? 7500 : 2400);
   } catch (error) {
     console.error(error); world?.dispose(); world = null; returnHome();
     showSheet('error', 'СИСТЕМА НАБЛЮДЕНИЯ', 'Камера недоступна', '<p>Не удалось открыть трёхмерную сцену. Обновите страницу или попробуйте другой браузер.</p>' + button('launch','Повторить'));
@@ -153,7 +177,21 @@ function journal() {
   const m = current(), rooms = world.getLocations?.() || {};
   const goal = (name, done, room) => '<li class="' + (done ? 'done' : '') + '"><i class="mark">' + (done ? icon('check') : '') + '</i><span>' + escape(name) + (room ? ' <small class="micro"> / ' + escape(room) + '</small>' : '') + '</span></li>';
   const note = state.read ? '<div class="note-paper"><span class="micro">ЗАПИСАННАЯ УЛИКА</span><p>' + escape(m.clue) + '</p></div>' : '';
-  showSheet('journal','ПОЛЕВОЙ ЖУРНАЛ / МИССИЯ ' + pad(m.id),m.title,'<p>' + escape(m.brief) + '</p><ul class="goal-list">' + goal(m.item,state.collected,rooms.item) + goal('Улика',state.read,rooms.clue) + goal(m.station,false,rooms.station) + '</ul>' + note + '<div class="actions">' + button('resume','Вернуться в корпус '+icon('next')) + '</div>',resumeWorld);
+  const clueName = m.id === 1 ? 'Табличка проходов' : m.id === 2 ? 'Контрольная лента' : 'Улика';
+  const hasToken = m.id === 1 && state.collected;
+  const mark = hasToken ? goal(state.tokenInspected ? 'На обороте одна косая насечка' : 'Осмотреть оборот жетона', state.tokenInspected) : '';
+  const inspect = hasToken ? button('inspect-token','Осмотреть жетон','secondary') : '';
+  showSheet('journal','ПОЛЕВОЙ ЖУРНАЛ / МИССИЯ ' + pad(m.id),m.title,'<p>' + escape(m.brief) + '</p><ul class="goal-list">' + goal(m.item,state.collected,rooms.item) + mark + goal(clueName,state.read,rooms.clue) + goal(m.station,false,rooms.station) + '</ul>' + note + '<div class="actions">' + inspect + button('resume','Вернуться в корпус '+icon('next')) + '</div>',resumeWorld);
+}
+function inspectToken(back = resumeWorld) {
+  if (current().id !== 1 || !state.collected) return;
+  pauseWorld();
+  showSheet('token','ПРЕДМЕТ ИЗ ПРИЁМНОЙ',current().item,'<div id="token-inspector"></div><div class="actions">' + button('dismiss','Убрать жетон') + '</div>',back);
+  mountToken($('#token-inspector'), () => {
+    if (state.tokenInspected) return;
+    state.tokenInspected = true;
+    save(); updateHud();
+  });
 }
 function interact(kind) {
   if (!playing || dialog.open || failure || finished()) return;
@@ -161,14 +199,17 @@ function interact(kind) {
   if (kind === 'item') {
     if (!state.collected) {
       state.collected = true; world.setCollected(true); save(); updateHud(); audio.pickup();
-      notice('В инвентаре · ' + m.item);
+      if (m.id === 1) inspectToken();
+      else notice('В инвентаре · ' + m.item);
     }
   } else if (kind === 'clue') {
     pauseWorld(); state.read = true; world.setClueRead?.(true); save(); updateHud(); audio.signal();
-    showSheet('clue','УЛИКА / ДЕЛО ' + pad(m.id),'Полевая запись','<div class="note-paper"><p class="lead">' + escape(m.clue) + '</p></div><div class="actions">' + button('resume','Убрать в журнал '+icon('file')) + '</div>',resumeWorld);
+    const title = m.id === 1 ? 'Табличка проходов' : m.id === 2 ? 'Контрольная лента' : 'Полевая запись';
+    showSheet('clue','УЛИКА / ДЕЛО ' + pad(m.id),title,'<div class="note-paper"><p class="lead">' + escape(m.clue) + '</p></div><div class="actions">' + button('resume','Убрать в журнал '+icon('file')) + '</div>',resumeWorld);
   } else if (kind === 'station') {
+    if (m.id === 1 && state.collected && !state.tokenInspected) { inspectToken(); return; }
     if (!state.collected || !state.read) {
-      notice(!state.collected ? 'Нужен предмет · ' + m.item : 'Сначала найдите улику. Ориентир есть в журнале.'); return;
+      notice(m.id <= 2 ? objectiveFor(m) : !state.collected ? 'Нужен предмет · ' + m.item : 'Сначала найдите улику. Ориентир есть в журнале.'); return;
     }
     pauseWorld();
     showSheet('puzzle','УЗЕЛ ДОСТУПА / МИССИЯ ' + pad(m.id),m.station,'<p class="lead">' + escape(m.prompt) + '</p><details class="note-paper"><summary>Свериться с уликой</summary><p>' + escape(m.clue) + '</p></details><div class="options">' + m.options.map((v,i) => '<button class="option" data-answer="' + i + '"><small>' + pad(i+1,2) + '</small> ' + escape(v) + '</button>').join('') + '</div><p class="error" role="status" id="puzzle-status"></p>',resumeWorld);
@@ -178,8 +219,23 @@ function interact(kind) {
 function solve(index, target) {
   if (overlay !== 'puzzle') return false;
   const m = current();
-  if (index !== m.answer) { if (target) target.disabled = true; $('#puzzle-status').textContent = 'Цепь не замкнулась. Сверьтесь с уликой и попробуйте ещё раз.'; audio.signal(); return false; }
-  state.completed = m.id; state.read = false; state.collected = false; save(); audio.pickup(); notice(''); focusOn(null);
+  if (index !== m.answer) {
+    if (m.id === 1 && index < 0) {
+      $('#puzzle-status').textContent = 'Сначала выберите приёмник.';
+      return false;
+    }
+    if (target) target.disabled = true;
+    $('#puzzle-status').textContent = m.id === 1
+      ? 'Турникет вернул жетон. Сверьте насечку с табличкой проходов.'
+      : 'Цепь не замкнулась. Сверьтесь с уликой и попробуйте ещё раз.';
+    audio.signal(); return false;
+  }
+  state.completed = m.id; state.read = false; state.collected = false; state.tokenInspected = false; save(); notice(''); focusOn(null);
+  if (m.id === 1) {
+    world.advanceToClock(current()); resumeWorld(); audio.turnstile();
+    return true;
+  }
+  audio.pickup();
   if (finished()) { ending(); return true; }
   showSheet('success','ПРОТОКОЛ ЗАКРЫТ / ' + pad(m.id) + ' ИЗ ' + missions.length,m.title,'<p class="lead">' + escape(m.resolution) + '</p><div class="note-paper"><span class="micro">СЛЕДУЮЩАЯ МИССИЯ / ' + pad(current().id) + '</span><h3>' + escape(current().title) + '</h3><p>' + escape(current().brief) + '</p></div><div class="actions">' + button('launch','Продолжить '+icon('next')) + button('home','В главное меню','quiet') + '</div>',null);
   return true;
@@ -201,6 +257,8 @@ function doAction(action) {
     case 'pause': pauseMenu(); break;
     case 'resume': resumeWorld(); break;
     case 'journal': journal(); break;
+    case 'inspect-token': inspectToken(journal); break;
+    case 'dismiss': dismiss(); break;
     case 'archive': case 'dossier': archive(); break;
     case 'controls':
       if (overlay === 'settings') controls(() => settingsPanel(back)); else controls(back);
@@ -211,9 +269,19 @@ function doAction(action) {
     case 'interact': if (playing && !dialog.open && !world.interact()) notice('Подойдите ближе и направьте прицел на предмет.',1800); break;
     case 'new': showSheet('reset','НОВАЯ КАССЕТА','Стереть прохождение?','<p>Прогресс всех 100 миссий будет сброшен.</p><div class="actions">' + button('reset','Стереть и войти') + button('ending','Отмена','quiet') + '</div>',ending); break;
     case 'ending': ending(); break;
-    case 'reset': Object.assign(state,{completed:0,collected:false,read:false,started:false}); save(); launch(); break;
+    case 'reset': Object.assign(state,{completed:0,collected:false,read:false,tokenInspected:false,started:false}); save(); launch(); break;
   }
 }
+// During a multi-touch walk Chromium can omit the compatibility click on the HUD.
+$('#game').addEventListener('touchend', event => {
+  const control = event.target.closest('[data-action], #focus-hint');
+  if (!control) return;
+  event.preventDefault();
+  const finger = event.changedTouches[0];
+  if (control.contains(document.elementFromPoint(finger.clientX, finger.clientY))) {
+    doAction(control.dataset.action || 'interact');
+  }
+}, {passive:false});
 document.addEventListener('click', event => {
   if (event.target.closest('#focus-hint')) { doAction('interact'); return; }
   const el = event.target.closest('button'); if (!el) return;
@@ -237,7 +305,7 @@ document.addEventListener('input', event => {
 document.addEventListener('keydown', event => {
   if (!playing || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
   if (dialog.open) {
-    if (overlay === 'journal' && (event.code === 'Tab' || event.code === 'KeyJ')) { event.preventDefault(); dismiss(); }
+    if (overlay === 'journal' && event.code === 'KeyJ') { event.preventDefault(); dismiss(); }
     return;
   }
   const action = {KeyE:'interact',KeyF:'flashlight',KeyJ:'journal',Tab:'journal',Escape:'pause'}[event.code];
