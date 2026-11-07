@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#10110f">
+  <meta name="description" content="Нулевой корпус — камерный 3D-хоррор о пропавшей ночной смене НИИ «Контур».">
+  <title>Нулевой корпус — НИИ «Контур»</title>
+  <link rel="icon" href="assets/signet.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/threshold.webp" as="image">
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="instruments.css">
+</head>
+<body>
+  <svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-logo" viewBox="0 0 36 36"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M18 1 35 31H1L18 1Zm0 10L9 27h18l-2.4-4.3H16l2.5-4.4h3.6L18 11Z"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 10v4m4-7v10m4-14v18m4-15v12m4-10v8m4-6v4"/></symbol>
+    <symbol id="i-muted" viewBox="0 0 24 24"><path d="M3 10h4l5-4v12l-5-4H3zM17 9l5 6m0-6-5 6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M3 6h8m4 0h6M3 12h2m4 0h12M3 18h12m4 0h2"/><path d="M11 3v6M7 9v6m10 0v6"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7V5h7l2 2h9v13H3V7Z"/><path d="M3 10h18"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="1"/><path d="M5 9h1m2 0h1m2 0h1m2 0h1m2 0h1M5 12h1m2 0h1m2 0h1m2 0h1m2 0h1M8 15h8"/></symbol>
+    <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M3 16v-4a9 9 0 0 1 18 0v4"/><rect x="3" y="13" width="4" height="7" rx="1"/><rect x="17" y="13" width="4" height="7" rx="1"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m5 5 14 14M19 5 5 19"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8m-8 4h6"/></symbol>
+    <symbol id="i-tape" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="7" cy="11" r="2"/><circle cx="17" cy="11" r="2"/><path d="M7 13h10m-12 6 2-3h10l2 3"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14m8-14v14" stroke-width="3"/></symbol>
+    <symbol id="i-light" viewBox="0 0 24 24"><path d="m3 18 8-8 3 3-8 8zM11 10l1-5 7 7-5 1m1-10 1-2m3 6 3-1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m3 12 6 6L21 6"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/></symbol>
+  </svg>
+  <div id="terminal">
+    <header class="mast">
+      <div class="brand"><svg class="brand-symbol"><use href="#i-logo"/></svg><span>КОНТУР</span><i></i><small>НАУЧНО-ИССЛЕДОВАТЕЛЬСКИЙ<br>ИНСТИТУТ</small></div>
+      <nav aria-label="Навигация"><button class="nav-link active" data-action="home"><span class="nav-led"></span>Главное меню</button><button class="nav-link" data-action="archive">Архив миссий</button></nav>
+      <div class="utilities"><button class="icon-btn sound" data-action="sound" aria-label="Включить звук" title="Включить звук"><svg><use href="#i-muted"/></svg></button><span class="util-rule"></span><button class="icon-btn" data-action="settings" aria-label="Настройки" title="Настройки"><svg><use href="#i-settings"/></svg></button></div>
+    </header>
+    <main class="feed">
+      <div class="exposure"></div><div class="scanlines"></div>
+      <div class="frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="feed-top telemetry"><span class="feed-id"><svg><use href="#i-tape"/></svg>ВИДЕОАРХИВ <b>/</b> КАССЕТА 001</span><span class="rec"><i></i> REC <span id="timer">00:00:00</span></span></div>
+      <div class="hero">
+        <div class="genre"><i></i> ПСИХОЛОГИЧЕСКИЙ ХОРРОР</div>
+        <h1>НУЛЕВОЙ<br>КОРПУС<span class="title-stop">.</span></h1>
+        <p>Десять лет назад этот корпус исчез. Сегодня из него пришла запись. На плёнке — ваш голос.</p>
+        <div class="hero-actions"><button class="primary launch" data-action="launch"><span id="launch-label">Войти в корпус</span><svg><use href="#i-next"/></svg></button><button class="secondary" data-action="controls"><svg><use href="#i-keyboard"/></svg>Управление</button></div>
+      </div>
+      <div class="feed-bottom telemetry"><span class="datecode">12 НОЯ 1996 <b>/</b> 03:17</span><span class="camcode"><i class="signal-bars"><i></i><i></i><i></i><i></i></i> КАМ. 01 <b>/</b> ПРОХОДНАЯ</span></div>
+    </main>
+    <footer class="deck">
+      <button class="mission-card" data-action="dossier"><span class="file-icon"><svg><use href="#i-folder"/></svg></span><span class="mission-lines"><span class="micro">ТЕКУЩАЯ МИССИЯ</span><span class="mission-line"><b id="mission-number">001</b><i>/</i><span id="mission-title">Чужой пропуск</span></span></span><svg class="deck-arrow"><use href="#i-chevron"/></svg></button>
+      <div class="progress"><div><span class="micro">ПРОГРЕСС КАМПАНИИ</span><span id="progress-count">000 <i>/ 100</i></span></div><div class="track"><i id="progress-fill"></i></div></div>
+      <button class="sound-note" data-action="settings" aria-label="Настройки звука"><svg><use href="#i-headphones"/></svg><span>Атмосфернее<br>в наушниках</span></button>
+    </footer>
+  </div>
+  <div id="game" hidden>
+    <div id="world"></div><div class="world-vignette"></div>
+    <div class="game-top"><button id="objective" data-action="journal"></button><div class="hud-buttons"><button class="hud-icon" data-action="journal" aria-label="Полевой журнал"><svg><use href="#i-file"/></svg></button><button class="hud-icon" data-action="pause" aria-label="Пауза"><svg><use href="#i-pause"/></svg></button></div></div>
+    <div class="crosshair" aria-hidden="true"></div><div id="focus-hint" hidden><kbd>E</kbd> <span></span></div>
+    <div id="notice" role="status"></div>
+    <div class="game-bottom"><span class="telemetry game-record"><i></i> REC <b>/</b> <span id="game-clock"></span></span><div class="hud-keys"><button data-action="flashlight"><kbd>F</kbd><svg><use href="#i-light"/></svg><span id="light-state">Свет вкл.</span></button><button class="use-key" data-action="interact"><kbd>E</kbd> Осмотреть</button></div></div>
+  </div>
+  <dialog id="dialog" aria-labelledby="dialog-title"><div class="sheet"><header class="sheet-top"><span class="micro" id="dialog-kicker"></span><button id="dialog-close" class="icon-btn" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button></header><div id="dialog-body"></div></div></dialog>
+  <noscript>Включите JavaScript, чтобы запустить игру.</noscript>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

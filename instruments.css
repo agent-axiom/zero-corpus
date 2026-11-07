@@ -1,0 +1,124 @@
+.kontur-instrument {
+  --inst-ink: #f0d49e;
+  --inst-warm: #efa96a;
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+  padding: clamp(13px, 3vw, 22px);
+  border: 1px solid #756b54;
+  border-radius: 3px;
+  color: #ece4cf;
+  background: repeating-linear-gradient(0deg, #fff0 0 2px, #aaa38d09 3px 4px), linear-gradient(140deg, #37382d, #24251e 60%, #313027);
+  box-shadow: inset 0 0 0 3px #171813, inset 0 0 0 4px #4e4c3c, 0 4px 12px #0003;
+  font-family: var(--mono, monospace);
+}
+.kontur-instrument .inst-plate {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #e7dcc1;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.kontur-instrument .inst-plate::before,
+.kontur-instrument .inst-plate::after {
+  content: '';
+  flex: 0 0 5px;
+  width: 5px;
+  height: 5px;
+  border: 1px solid #938878;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #635d50 40%, #24231c 40% 55%, #635d50 55%);
+}
+.kontur-instrument .inst-body {display: grid; gap: 12px; min-width: 0}
+.kontur-instrument .inst-key {
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: 1px solid #7c7865;
+  border-bottom-color: #34332a;
+  border-radius: 2px;
+  background: linear-gradient(#4e4d40, #37372f);
+  box-shadow: inset 0 1px #85816b66, 0 2px #171813;
+  color: #f2ecdc;
+  font: 500 13px/1.25 var(--mono, monospace);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.kontur-instrument .inst-key:hover:not(:disabled) {border-color: #d4a879; color: #ffe0b6}
+.kontur-instrument .inst-key:active:not(:disabled) {transform: translateY(1px); box-shadow: inset 0 2px 3px #1119}
+.kontur-instrument .inst-key:disabled {opacity: .55; cursor: default}
+.kontur-instrument .inst-key:focus-visible,
+.kontur-instrument input:focus-visible {outline: 2px solid var(--inst-warm); outline-offset: 2px}
+.kontur-instrument .inst-meter,
+.kontur-instrument .inst-slot,
+.kontur-instrument .inst-wheel {
+  box-sizing: border-box;
+  border: 1px solid #151710;
+  border-bottom-color: #777159;
+  border-radius: 2px;
+  background: linear-gradient(165deg, #23271d, #10150e);
+  box-shadow: inset 1px 2px 4px #0007;
+  color: var(--inst-ink);
+}
+.kontur-instrument .inst-meter {display: flex; align-items: baseline; justify-content: center; gap: 10px; padding: 6px 16px}
+.kontur-instrument .inst-digits {
+  width: 5ch;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--inst-ink);
+  font: 500 32px/1.35 var(--mono, monospace);
+  letter-spacing: .08em;
+  text-align: center;
+  caret-color: var(--inst-warm);
+}
+.kontur-instrument .inst-unit {color: #b9ad89; font-size: 13px}
+.kontur-instrument .inst-keypad {display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px}
+.kontur-instrument .inst-keypad .inst-key {font-size: 16px}
+.kontur-instrument .inst-keypad .inst-key:nth-last-child(3) {font-size: 12px}
+.kontur-instrument .inst-drums {display: flex; align-items: center; justify-content: center; gap: clamp(3px, 1.8vw, 12px)}
+.kontur-instrument .inst-drum {display: grid; gap: 4px; width: min(22%, 82px); text-align: center}
+.kontur-instrument .inst-engraving {color: #c0b8a4; font-size: 11px}
+.kontur-instrument .inst-drum .inst-key {min-height: 35px; font-size: 17px}
+.kontur-instrument .inst-wheel {width: 100%; min-width: 0; padding: 5px 0; text-align: center; font: 500 clamp(22px, 5vw, 33px)/1.15 var(--mono, monospace)}
+.kontur-instrument .inst-colon {padding-top: 16px; color: var(--inst-ink); font-size: 22px}
+.kontur-instrument .inst-rack {display: flex; gap: 5px; margin: 0; padding: 0; list-style: none}
+.kontur-instrument .inst-slot {display: grid; gap: 8px; flex: 1 1 0; min-width: 0; padding: 6px 8px 9px; font-size: 13px; text-transform: capitalize; overflow-wrap: anywhere}
+.kontur-instrument .inst-slot small {color: #a6a189; font-size: 10px}
+.kontur-instrument .inst-switchbank,
+.kontur-instrument .inst-edit {display: flex; flex-wrap: wrap; gap: 6px}
+.kontur-instrument .inst-switchbank .inst-key {flex: 1 1 auto; text-transform: capitalize}
+.kontur-instrument .inst-edit .inst-key {min-height: 36px; padding: 4px 10px; color: #e0d6bf; font-size: 11px}
+.kontur-instrument .inst-footer {display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid #555345}
+.kontur-instrument .inst-lamp {display: flex; align-items: center; gap: 7px; color: #cdc4ae; font-size: 11px}
+.kontur-instrument .inst-lamp::before {content: ''; width: 7px; height: 7px; border: 1px solid #978966; border-radius: 50%; background: #706345}
+.kontur-instrument .inst-bad::before {background: #fa785b; box-shadow: 0 0 5px #eb704c}
+.kontur-instrument .inst-ok::before {background: #c8db8f; box-shadow: 0 0 5px #c1d283}
+.kontur-instrument .inst-confirm {border-color: #efa365 #a85832 #653c27; background: linear-gradient(#d88e56, #b66d3e); color: #1a1b12; font-weight: 700}
+.kontur-instrument .inst-confirm:hover:not(:disabled) {background: #eba267; color: #13160e}
+.kontur-instrument .inst-junction {display: grid; justify-items: center}
+.kontur-instrument .inst-inlet {height: 20px; color: #d2c7ab; font-size: 11px}
+.kontur-instrument .inst-wire {position: relative; width: 100%; height: 27px; background: linear-gradient(#878273, #878273) center top / 1px 10px no-repeat}
+.kontur-instrument .inst-patched .inst-wire::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: min(50%, var(--route));
+  right: calc(100% - max(50%, var(--route)));
+  border-bottom: 2px solid var(--inst-warm);
+}
+.kontur-instrument .inst-patched .inst-wire::after {content: ''; position: absolute; left: var(--route); top: 9px; bottom: 0; border-left: 2px solid var(--inst-warm)}
+.kontur-instrument .inst-outlets {display: grid; margin-top: -12px}
+.kontur-instrument .inst-outlets .inst-key {display: grid; justify-items: center; align-content: center; gap: 7px; margin: 0 2px; padding: 7px 2px; font-size: 12px; overflow-wrap: anywhere}
+.kontur-instrument .inst-outlets .inst-key::before {content: ''; width: 10px; height: 10px; border: 2px solid #aaa087; border-radius: 50%; background: #1a1b16}
+.kontur-instrument .inst-outlets .inst-key[aria-pressed=true] {border-color: var(--inst-warm); background: #514332}
+.kontur-instrument .inst-outlets .inst-key[aria-pressed=true]::before {background: var(--inst-warm)}
+@media (pointer: coarse) {
+  .kontur-instrument .inst-key, .kontur-instrument .inst-drum .inst-key, .kontur-instrument .inst-edit .inst-key {min-height: 44px}
+}
