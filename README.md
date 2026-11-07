@@ -53,3 +53,9 @@ npm run build
 Первая команда проверяет данные кампании и связность маршрутов. Последние две собирают автономную версию в `dist/index.html`. Скопируйте этот HTML на другой компьютер и откройте в современном браузере. Игра подгрузит код, изображение и шрифты из самого файла.
 
 Three.js распространяется по MIT, шрифты Roboto и IBM Plex Mono — по SIL OFL. Тексты лицензий находятся в `vendor/` и `assets/fonts/`. Фон меню создан для этой игры.
+
+## Публикация
+
+При открытии pull request в `main` и при обновлении самой ветки GitHub Actions проверяет кампанию, собирает автономную игру и запускает её в Chrome. После успешной проверки `main` тот же `dist/index.html` отправляется в GitHub Pages. Правила заданы в [workflow Pages](.github/workflows/pages.yml).
+
+Для домена `zero-corpus.kosarevsky.dev` в настройках Pages репозитория укажите источник **GitHub Actions** и этот адрес в **Custom domain**. В DNS зоны `kosarevsky.dev` запись `CNAME` с именем `zero-corpus` должна указывать на `agent-axiom.github.io`. После выдачи сертификата включите **Enforce HTTPS**.

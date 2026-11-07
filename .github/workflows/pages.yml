@@ -1,0 +1,59 @@
+name: Pages
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Check that the standalone game starts in Chrome
+        run: |
+          google-chrome --headless --disable-gpu --disable-background-networking --timeout=10000 \
+            --dump-dom "file://$GITHUB_WORKSPACE/dist/index.html" > "$RUNNER_TEMP/game-dom.html"
+          grep -Eq 'id="game-clock">[0-9]{2}:[0-9]{2}:[0-9]{2}</span>' "$RUNNER_TEMP/game-dom.html"
+      - name: Stage the tested game
+        if: github.ref == 'refs/heads/main'
+        run: install -Dm644 dist/index.html "$RUNNER_TEMP/pages/index.html"
+      - uses: actions/upload-pages-artifact@v5
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ${{ runner.temp }}/pages
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
