@@ -337,8 +337,12 @@ export function buildFacility(mission, layout) {
     lamp(side * (span - .3) * CELL, z, 1.35);
     at(x, z, rot, () => {
       const back = -CELL * .35 + .09;
-      sign(title, roomCode, 0, 2.28, back, 1.56, .57);
-      if (i === layout.itemRoom || i === layout.clueRoom) {
+      const hasFireDoor = i !== layout.itemRoom && i !== layout.clueRoom;
+      const frameHeight = 2.32;
+      const signHeight = .57;
+      const signY = hasFireDoor ? frameHeight + .10 + signHeight / 2 : 2.28;
+      sign(title, roomCode, 0, signY, back, 1.56, signHeight);
+      if (!hasFireDoor) {
         table();
         block(mat.dark, -.64, 1.01, -.14, .23, .06, .20);
         block(mat.steel, -.64, 1.25, -.15, .035, .47, .035);
@@ -376,9 +380,9 @@ export function buildFacility(mission, layout) {
         solid(sideX, -.49, 1.42, .75);
       }
       roomEquipment(layout.chapter, -sideX, i);
-      if (i !== layout.clueRoom && i !== layout.itemRoom) {
+      if (hasFireDoor) {
         // A locked, inset fire door with a wheel and a faded inspection plate.
-        block(mat.trim, 0, 1.16, back, 1.44, 2.32, .11);
+        block(mat.trim, 0, frameHeight / 2, back, 1.44, frameHeight, .11);
         block(mat.door, 0, 1.12, back + .07, 1.29, 2.22, .07);
         block(mat.glass, 0, 1.62, back + .11, .48, .35, .027);
         block(mat.zinc, .42, 1.04, back + .13, .19, .045, .07);
