@@ -157,6 +157,12 @@ export function buildCheckpoint({group, mat, box, round, plane, block, mesh, sig
   solid(0, clock.z - .12, 3.18, .88);
   block(mat.dark, 0, 1.65, clock.z - .12, .89, 1.15, .35);
   mesh(plane, dial, 0, clock.y, clock.z + .063, .80, .80, 1);
+  const minuteHand = new THREE.Group();
+  minuteHand.position.set(0, clock.y, clock.z + .077);
+  minuteHand.rotation.z = -17 * Math.PI / 30;
+  part(minuteHand, box, mat.black, 0, .14, 0, .014, .29, .009);
+  minuteHand.visible = false;
+  group.add(minuteHand);
   sign('ТАБЕЛЬ', 'ПОСТ 02', 0, 1.25, clock.z + .063, .44, .13);
   block(mat.black, phone.x, 1.15, phone.z, .46, .13, .31);
   mesh(round, mat.zinc, phone.x, 1.225, phone.z + .06, .17, .035, .17);
@@ -169,7 +175,7 @@ export function buildCheckpoint({group, mat, box, round, plane, block, mesh, sig
     phone.z + .08 + (i % 2) * .035, .037, .05, .065);
   lamp(hand.x, hand.z, .89); lamp(tape.x, tape.z, .89);
 
-  const cp = {progress: 0, active: false, looseHand, plateFace, dial, slip, pulse: 0,
+  const cp = {progress: 0, active: false, looseHand, minuteHand, plateFace, dial, slip, pulse: 0,
     setProgress(progress) {
       cp.progress = progress;
       hinge.rotation.y = gateAngle(progress);

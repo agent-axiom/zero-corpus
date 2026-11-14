@@ -30,5 +30,6 @@ test('Обе миссии занимают одну проходную, и вс�
   for (const p of Object.values(booth.points)) {
     assert.ok(booth.inside(p.x, p.z) && p.z < POST.gateZ - POST.span);
   }
-  assert.equal(layoutFor(3).opening, false);
+  for (let id = 3; id <= 10; id++) assert.deepEqual(layoutFor(id).cells, entry.cells);
+  assert.equal(layoutFor(11).opening, false);
 });

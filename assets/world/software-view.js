@@ -2,6 +2,7 @@
 import {CELL, HEIGHT} from './facility.js';
 import {gateAngle, POST} from './checkpoint.js';
 import {REPAIR} from './repair.js';
+import {CHAPTER_SITES} from './chapter.js';
 
 function shade(rgb, light) {
   const word = Math.min(255, rgb[0] * light) | (Math.min(255, rgb[1] * light) << 8) | (Math.min(255, rgb[2] * light) << 16);
@@ -103,6 +104,27 @@ export function softwareView(canvas) {
       sprites.push({x: p.cx - width * p.scale / 2, y: top, w: width * p.scale,
         h: height * p.scale, d: p.d, color, label, face, dim});
     }
+    function panel(x1, z1, x2, z2, bottom, height, color) {
+      const a = project(x1, z1),
+        b = project(x2, z2);
+      if (!a || !b) return;
+      const topA = horizon - (bottom + height - eye.y) * a.scale;
+      const topB = horizon - (bottom + height - eye.y) * b.scale;
+      sprites.push({
+        x: Math.min(a.cx, b.cx),
+        w: Math.abs(a.cx - b.cx),
+        y: Math.min(topA, topB),
+        h: height * Math.max(a.scale, b.scale),
+        d: (a.d + b.d) / 2,
+        color,
+        quad: [
+          [a.cx, topA],
+          [b.cx, topB],
+          [b.cx, topB + height * b.scale],
+          [a.cx, topA + height * a.scale],
+        ],
+      });
+    }
     for (const room of layout.rooms) {
       const x = room.side * .99, z = -(room.row - .50) * CELL;
       const text = room.side < 0 ? '← ' + room.title : room.title + ' →';
@@ -111,7 +133,7 @@ export function softwareView(canvas) {
     for (const o of facility.obstacles) {
       const isTable = Object.values(layout.points).some(p => Math.hypot(p.x - o.x, p.z - o.z) < .85);
       const reception = layout.opening && o.x === layout.rooms[0].x && o.z === layout.rooms[0].z;
-      if (isTable || reception || o.checkpoint || o.repair) continue;
+      if (isTable || reception || o.checkpoint || o.repair || o.chapterProp) continue;
       const tall = Math.max(o.w, o.d) >= .57;
       const width = Math.max(.45, o.w * 1.7 + o.d * .55);
       sprite(o.x, .03, o.z, width, tall ? 1.65 : .60, tall ? '#485348' : '#686450');
@@ -162,6 +184,10 @@ export function softwareView(canvas) {
       if (checkpoint.progress >= .58) sprite(clock.x, 1.40, clock.z + .04, .84, .84,
         checkpoint.pulse > .3 ? '#ffda90' : '#c8b080');
       sprite(clock.x, clock.y - .40, clock.z + .07, .8, .8, '#c5bc9d', '', checkpoint.dial.map.image, checkpoint.progress < .58 ? .42 : 0);
+      if(checkpoint.minuteHand.visible) for(let length=.03;length<.29;length+=.025) {
+        sprite(clock.x+Math.sin(17*Math.PI/30)*length,clock.y+Math.cos(17*Math.PI/30)*length,
+          clock.z+.08,.018,.025,'#283027');
+      }
       sprite(phone.x, 1.09, phone.z, .47, .13, '#242b24');
       sprite(phone.x, 1.29, phone.z - .075, .45, .08, '#1d241e');
       for (const side of [-1, 1]) sprite(phone.x + side * .19, 1.22, phone.z - .05, .14, .115, '#202820');
@@ -178,6 +204,66 @@ export function softwareView(canvas) {
         sprite(p.x, 1.04, p.z, .86, .68, '#827e6a');
         sprite(p.x, 1.20, p.z + .06, .62, .37, '#7eaa78');
       }
+    }
+    if (facility.chapterScene) {
+      const chapter = facility.chapterScene;
+      for (const door of chapter.doors) {
+        if (door.axis === 'z') {
+          const high = door.z - 3.835,
+            low = door.z + 3.465;
+          panel(door.x, high, door.x, door.z - 0.85, 0, 2.86, '#5c6956');
+          panel(door.x, door.z + 0.85, door.x, low, 0, 2.86, '#5c6956');
+          panel(door.x, door.z - 0.85, door.x, door.z + 0.85, 2.4, 0.46, '#5c6956');
+        }
+        const angle = (door.progress * Math.PI) / 2;
+        const dx = (door.axis === 'z' ? Math.sin(angle) : Math.cos(angle)) * door.span;
+        const dz = (door.axis === 'z' ? Math.cos(angle) : -Math.sin(angle)) * door.span;
+        panel(door.hingeX, door.hingeZ, door.hingeX + dx, door.hingeZ + dz, 0, 2.4, '#435340');
+        sprite(door.hingeX + dx * 0.65, 1.05, door.hingeZ + dz * 0.65, 0.09, 0.18, '#b4b39a');
+        sprite(
+          door.hingeX + dx * 0.5,
+          1.6,
+          door.hingeZ + dz * 0.5,
+          0.08,
+          0.1,
+          door.target ? '#b9d18f' : '#dc6740',
+        );
+      }
+      for (const [id, station] of chapter.stations) {
+        const p = station.point,
+          site = CHAPTER_SITES[id],
+          item = chapter.items.get(id);
+        if (id !== 9) {
+          sprite(p.x, 0.03, p.z - 0.17, 1.18, 1.1, '#505d4c');
+          sprite(p.x, 1.12, p.z - 0.12, 1.34, 0.08, '#858976');
+        }
+        sprite(
+          p.x,
+          id === 9 ? 1.04 : p.y - 0.19,
+          p.z + 0.2,
+          id === 9 ? 0.28 : 0.78,
+          id === 9 ? 0.1 : 0.38,
+          station.changed.visible ? '#abc987' : '#9b6843',
+        );
+        sprite(p.x, 1.76, p.z - 0.12, 1.6, 0.37, '#344532', station.label);
+        sprite(site.clue.x, site.clue.y - 0.3, site.clue.z, 0.86, 0.6, '#c9c1a4', 'ЗАПИСЬ');
+        if (item?.visible && id !== 3)
+          sprite(site.item.x, site.item.y, site.item.z, 0.3, 0.11, id === 9 ? '#454431' : '#d5b47c');
+        if (station.changed.visible) sprite(p.x, p.y - 0.04, p.z + 0.24, 0.4, 0.06, '#dccb92');
+      }
+      if (chapter.keyInLock.visible) {
+        const archive = chapter.doors[0],
+          angle = (archive.progress * Math.PI) / 2;
+        sprite(
+          archive.hingeX - 0.11 * Math.cos(angle) + 1.3 * Math.sin(angle),
+          1.01,
+          archive.hingeZ + 0.11 * Math.sin(angle) + 1.3 * Math.cos(angle),
+          0.2,
+          0.05,
+          '#d9b16f',
+        );
+      }
+      if (chapter.completed < 7) sprite(-6, 0.02, -11.55, 0.9, 1.24, '#485641');
     }
     if (watcher.visible) {
       const p = watcher.position;
@@ -211,7 +297,7 @@ export function softwareView(canvas) {
       sprite(-1.71,.87,item.z,.65,.94,'#344236');
       sprite(-1.55,1.0,item.z+.02,.52,.68,'#1f2a21');
       sprite(-1.46,1.80,item.z+.03,.72,.25,'#384533','КЛЮЧНИЦА');
-      if (!collected) {
+      if (facility.repair.key.visible) {
         sprite(item.x,1.19,item.z+.07,.18,.31,'#c5ad71');
         sprite(item.x,1.48,item.z+.08,.11,.10,'#aeb69a');
       }

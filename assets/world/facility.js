@@ -1,6 +1,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import {buildCheckpoint, POST} from './checkpoint.js';
-import {buildRepair, REPAIR} from './repair.js';
+import {buildRepair} from './repair.js';
+import {buildChapter, CHAPTER_SITES} from './chapter.js';
 import {labelMaterial, makeSurfaces, palettes, randomSource} from './surfaces.js';
 
 export const CELL = 3.65;
@@ -23,7 +24,7 @@ export function layoutFor(id) {
   const chapter = Math.max(0, Math.min(9, Math.floor((id - 1) / 10)));
   const cells = new Map();
   const put = (x, r) => cells.set(key(x, r), [x, r]);
-  const end = 10 + (chapter % 2);
+  const end = chapter === 0 ? 12 : 10 + (chapter % 2);
   for (let r = 0; r <= end; r++) put(0, r);
   const rooms = [];
   for (let tier = 0; tier < 2; tier++) {
@@ -47,8 +48,8 @@ export function layoutFor(id) {
     for (let r = 3; r <= 7; r++) put(side * 2, r);
   }
 
-  const opening = id === 1 || id === 2;
-  if (opening) for (const row of [9, 10]) for (const side of [-1, 1]) put(side, row);
+  const opening = chapter === 0;
+  if (opening) for (const row of [9, 10, 11]) for (const side of [-1, 1]) put(side, row);
 
   const itemRoom = opening ? 0 : (id - 1) % rooms.length;
   const clueRoom = (itemRoom + 1 + Math.floor((id - 1) / 4) % 3) % rooms.length;
@@ -60,7 +61,10 @@ export function layoutFor(id) {
   };
   if (id === 1) Object.assign(points, {clue: POST.plate, station: POST.reader});
   if (id === 2) Object.assign(points, {item: POST.hand, clue: POST.tape, station: POST.clock});
-  if (id === 3) points.item = REPAIR.item;
+  if (CHAPTER_SITES[id]) {
+    const {item, clue, station} = CHAPTER_SITES[id];
+    Object.assign(points, {item, clue, station});
+  }
   return {id, opening, chapter, cells, end, rooms, itemRoom, clueRoom, points,
     has(x, r) {return cells.has(key(x, r));},
     inside(x, z) {return cells.has(key(Math.floor(x / CELL + .5), Math.floor(-z / CELL + .5)));},
@@ -396,7 +400,7 @@ export function buildFacility(mission, layout) {
         }
         solid(sideX, -.49, 1.42, .75);
       }
-      roomEquipment(layout.chapter, -sideX, i);
+      if (!layout.opening) roomEquipment(layout.chapter, -sideX, i);
       if (hasFireDoor) {
         // A locked, inset fire door with a wheel and a faded inspection plate.
         block(mat.trim, 0, frameHeight / 2, back, 1.44, frameHeight, .11);
@@ -409,29 +413,31 @@ export function buildFacility(mission, layout) {
   }
 
   let repair = null;
-  if (layout.id === 3) {
+  if (layout.opening) {
     const firstProp = obstacles.length;
     repair = buildRepair({group, mat, box, round, block, mesh, sign, solid});
     for (let i = firstProp; i < obstacles.length; i++) obstacles[i].repair = true;
   }
-  const item = repair ? repair.key : itemModel(layout.opening ? 'Жетон' : mission.item, mat, layout.opening);
+  const item = itemModel(layout.opening ? 'Жетон' : mission.item, mat, layout.opening);
   const itemDesk = layout.rooms[layout.itemRoom];
-  if (!repair) {
-    item.position.set(itemDesk.x, .995, itemDesk.z);
-    item.rotation.y = itemDesk.rot - .18;
-  }
-  item.visible = mission.id !== 2;
+  item.position.set(itemDesk.x, .995, itemDesk.z);
+  item.rotation.y = itemDesk.rot - .18;
+  item.visible = mission.id === 1 || !layout.opening;
   group.add(item);
 
   const station = layout.points.station;
   let checkpoint = null;
+  let chapterScene = null;
   if (layout.opening) {
     const firstProp = obstacles.length;
     checkpoint = buildCheckpoint({group, mat, box, round, plane, block, mesh, sign, solid, lamp, at, table});
     // These fixtures have their own silhouettes in the raycast renderer.
     for (let i = firstProp; i < obstacles.length; i++) obstacles[i].checkpoint = true;
-    checkpoint.active = mission.id === 2;
+    checkpoint.active = mission.id >= 2;
     checkpoint.setProgress(checkpoint.active ? 1 : 0);
+    const firstChapterProp = obstacles.length;
+    chapterScene = buildChapter({group, mat, box, round, plane, block, mesh, sign, solid, at, table, repair});
+    for (let i = firstChapterProp; i < obstacles.length; i++) obstacles[i].chapterProp = true;
   } else at(station.x, station.z, 0, () => {
     const stationName = String(mission.station || 'Контроль');
     if (/турникет/.test(stationName.toLowerCase())) {
@@ -513,7 +519,7 @@ export function buildFacility(mission, layout) {
     instance.computeBoundingSphere();
     group.add(instance);
   }
-  return {group, item, obstacles, lights, colors, mat, checkpoint, repair};
+  return {group, item, obstacles, lights, colors, mat, checkpoint, repair, chapterScene};
 }
 
 export function buildWatcher(materials) {

@@ -39,14 +39,14 @@ export function createAudio() {
     oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
     oscillator.start(); oscillator.stop(time + duration);
   }
-  function phoneRing(pan, distance) {
+  function phoneRing(pan, distance, short = false, delay = 0) {
     if (!enabled || !inWorld || !ctx || ctx.state !== 'running') return;
     const position = ctx.createStereoPanner?.();
     if (position) {
       position.pan.value = Math.max(-1, Math.min(1, pan));
       position.connect(master);
     }
-    const start = ctx.currentTime;
+    const start = ctx.currentTime + delay;
     const level = .18 / (1 + Math.max(0, distance) * .08);
     // One bell burst. The clapper alternately strikes two metal cups.
     const bells = [1035, 1470];
@@ -56,7 +56,7 @@ export function createAudio() {
       bell.type = 'triangle'; bell.frequency.value = hz;
       bell.connect(envelope); envelope.connect(position || master);
       envelope.gain.value = .0001;
-      for (let hit = 0; hit < 5; hit++) {
+      for (let hit = 0; hit < (short ? 2 : 5); hit++) {
         const at = start + hit * .13 + side * .065;
         envelope.gain.setValueAtTime(.0001, at);
         envelope.gain.exponentialRampToValueAtTime(level, at + .004);
@@ -66,7 +66,7 @@ export function createAudio() {
         bell.disconnect(); envelope.disconnect();
         if (--sounding === 0) position?.disconnect();
       };
-      bell.start(start); bell.stop(start + .74);
+      bell.start(start); bell.stop(start + (short ? .35 : .74));
     });
   }
   function watcherStep(pan, distance) {
@@ -99,6 +99,7 @@ export function createAudio() {
   }
   return {
     unlock, phoneRing, watcherStep,
+    phoneReply() { phoneRing(0, 4); phoneRing(0, 4, true, .98); },
     settings(on, level) { enabled = on; volume = level; apply(); },
     inWorld(on) { inWorld = on; apply(); },
     pickup() { tone(620, .13, .07, 'sine', 930); },
