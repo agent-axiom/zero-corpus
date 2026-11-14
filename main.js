@@ -18,13 +18,16 @@ const state = {
   collected: raw.collected === true, read: raw.read === true, started: raw.started === true,
   // The original plaque explicitly told the player which mark was on the token.
   tokenInspected: raw.completed === 0 && raw.collected === true &&
-    (raw.tokenInspected === true || (raw.tokenInspected === undefined && raw.read === true))
+    (raw.tokenInspected === true || (raw.tokenInspected === undefined && raw.read === true)),
+  encounterPassed: (Number.isFinite(raw.completed) && raw.completed >= 3) ||
+    (raw.completed === 2 && raw.encounterPassed === true)
 };
 const settings = {sound: cfg.sound !== false, volume: range(cfg.volume, 0, 1, .6), sensitivity: range(cfg.sensitivity, .3, 2, 1), grain: cfg.grain !== false};
 const audio = createAudio();
 const dialog = $('#dialog'), body = $('#dialog-body');
 let world, playing = false, loading = false, light = true, overlay = '', onDismiss = null;
 let hintTimeout, archiveChapter = 1, archiveMission = 1, launchTime = performance.now(), failure = false;
+let encounterSheltered = false;
 const current = () => missions[Math.min(state.completed, missions.length - 1)];
 const chapterOf = mission => chapters.find(ch => ch.id === mission.chapter);
 const finished = () => state.completed === missions.length;
@@ -74,7 +77,7 @@ dialog.addEventListener('click', e => { if (e.target === dialog && (e.clientX < 
 $('#dialog-close').addEventListener('click', dismiss);
 function notice(message, ms = 4400) {
   clearTimeout(hintTimeout); $('#notice').textContent = message || '';
-  if (message) hintTimeout = setTimeout(() => { $('#notice').textContent = ''; }, ms);
+  if (message && ms > 0) hintTimeout = setTimeout(() => { $('#notice').textContent = ''; }, ms);
 }
 function focusOn(kind) {
   const m = current();
@@ -95,6 +98,14 @@ function objectiveFor(m) {
     if (!state.read) return 'Изучить контрольную ленту в будке';
     return 'Выставить время на табельных часах';
   }
+  if (m.id === 3) {
+    if (!state.collected) return 'Найти бородку в ключнице у ремонтной';
+    if (!state.encounterPassed && world?.getEncounterStatus() === 'waiting') return 'Вернуться к ключнице у ремонтной';
+    if (!state.encounterPassed) return encounterSheltered
+      ? 'Оставайтесь за дверью, пока Обходчик проходит'
+      : 'Укройтесь в ремонтной за открытой дверью';
+    return state.read ? 'Собрать ключ на оправке' : 'Найти журнал слесаря в картотеке';
+  }
   return !state.collected ? 'Найти предмет · ' + m.item : !state.read ? 'Отыскать и изучить улику' : 'Использовать предмет · ' + m.station;
 }
 function updateHud() {
@@ -108,7 +119,7 @@ function resumeWorld() {
   clearSheet(); audio.unlock(); world.resume(); updateHud();
 }
 function returnHome() {
-  playing = false; failure = false; clearSheet(); world?.pause(); focusOn(null); notice('');
+  playing = false; failure = false; encounterSheltered = false; clearSheet(); world?.pause(); focusOn(null); notice('');
   $('#game').hidden = true; $('#terminal').hidden = false;
   audio.inWorld(false); refreshMenu(); $('.launch').focus({preventScroll:true});
 }
@@ -125,6 +136,18 @@ async function launch() {
         onThreat: message => { if (playing && message) { if (message.startsWith('Шаги стихли')) audio.signal(); else audio.threat(); notice(message, 6200); } },
         onFail: lost, onPause: () => { if (playing && !dialog.open && !failure) pauseMenu(); },
         onMove: () => audio.step(),
+        onEncounter: event => {
+          if (!playing) return;
+          if (event.phase === 'step') { audio.watcherStep(event.pan, event.distance); return; }
+          if (event.phase === 'warning') audio.relay();
+          encounterSheltered = event.sheltered === true;
+          if (event.message) notice(event.message, event.phase === 'passed' ? 6500 : 0);
+          updateHud();
+        },
+        onEncounterComplete: () => {
+          if (current().id !== 3 || state.encounterPassed) return;
+          state.encounterPassed = true; save(); updateHud();
+        },
         onPhoneRing: (pan, distance) => {
           audio.phoneRing(pan, distance);
           notice('За турникетом один раз звонит телефон. В будке загораются часы.', 4200);
@@ -132,12 +155,13 @@ async function launch() {
       });
     }
     const firstVisit = !state.started;
-    playing = true; failure = false; light = true; focusOn(null);
+    playing = true; failure = false; light = true; encounterSheltered = false; focusOn(null);
     $('#terminal').hidden = true; $('#game').hidden = false;
-    world.setSensitivity(settings.sensitivity); world.start(current());
+    world.setSensitivity(settings.sensitivity); world.start(current(), {encounterPassed: state.encounterPassed});
     world.setCollected(state.collected); world.setClueRead?.(state.read); world.setFlashlight(light);
     audio.inWorld(true); state.started = true; save(); updateHud();
-    if (current().id === 2) notice('Турникет открыт. Часы горят в будке за ним.', 3900);
+    if (current().id === 3 && state.collected && !state.encounterPassed) notice('Бородка ключа сохранена. Вернитесь к ключнице у ремонтной.', 0);
+    else if (current().id === 2) notice('Турникет открыт. Часы горят в будке за ним.', 3900);
     else notice(firstVisit ? (matchMedia('(pointer:coarse)').matches ? 'Слева — ходьба, справа — обзор. Цель и записи доступны в журнале.' : 'WASD — ходьба · Щёлкните в сцене для обзора · E — осмотреть · J — журнал') : 'Полевой журнал восстановлен', firstVisit ? 7500 : 2400);
   } catch (error) {
     console.error(error); world?.dispose(); world = null; returnHome();
@@ -181,7 +205,8 @@ function journal() {
   const hasToken = m.id === 1 && state.collected;
   const mark = hasToken ? goal(state.tokenInspected ? 'На обороте одна косая насечка' : 'Осмотреть оборот жетона', state.tokenInspected) : '';
   const inspect = hasToken ? button('inspect-token','Осмотреть жетон','secondary') : '';
-  showSheet('journal','ПОЛЕВОЙ ЖУРНАЛ / МИССИЯ ' + pad(m.id),m.title,'<p>' + escape(m.brief) + '</p><ul class="goal-list">' + goal(m.item,state.collected,rooms.item) + mark + goal(clueName,state.read,rooms.clue) + goal(m.station,false,rooms.station) + '</ul>' + note + '<div class="actions">' + inspect + button('resume','Вернуться в корпус '+icon('next')) + '</div>',resumeWorld);
+  const encounter = m.id === 3 && state.collected ? goal('Переждать обход в ремонтной',state.encounterPassed,'За открытой дверью слева от ключницы') : '';
+  showSheet('journal','ПОЛЕВОЙ ЖУРНАЛ / МИССИЯ ' + pad(m.id),m.title,'<p>' + escape(m.brief) + '</p><ul class="goal-list">' + goal(m.item,state.collected,rooms.item) + mark + encounter + goal(clueName,state.read,rooms.clue) + goal(m.station,false,rooms.station) + '</ul>' + note + '<div class="actions">' + inspect + button('resume','Вернуться в корпус '+icon('next')) + '</div>',resumeWorld);
 }
 function inspectToken(back = resumeWorld) {
   if (current().id !== 1 || !state.collected) return;
@@ -207,6 +232,10 @@ function interact(kind) {
     const title = m.id === 1 ? 'Табличка проходов' : m.id === 2 ? 'Контрольная лента' : 'Полевая запись';
     showSheet('clue','УЛИКА / ДЕЛО ' + pad(m.id),title,'<div class="note-paper"><p class="lead">' + escape(m.clue) + '</p></div><div class="actions">' + button('resume','Убрать в журнал '+icon('file')) + '</div>',resumeWorld);
   } else if (kind === 'station') {
+    if (m.id === 3 && state.collected && !state.encounterPassed) {
+      notice('Обходчик ещё рядом. Переждите его за дверью ремонтной, затем вернитесь к оправке.', 0);
+      return;
+    }
     if (m.id === 1 && state.collected && !state.tokenInspected) { inspectToken(); return; }
     if (!state.collected || !state.read) {
       notice(m.id <= 2 ? objectiveFor(m) : !state.collected ? 'Нужен предмет · ' + m.item : 'Сначала найдите улику. Ориентир есть в журнале.'); return;
@@ -269,7 +298,7 @@ function doAction(action) {
     case 'interact': if (playing && !dialog.open && !world.interact()) notice('Подойдите ближе и направьте прицел на предмет.',1800); break;
     case 'new': showSheet('reset','НОВАЯ КАССЕТА','Стереть прохождение?','<p>Прогресс всех 100 миссий будет сброшен.</p><div class="actions">' + button('reset','Стереть и войти') + button('ending','Отмена','quiet') + '</div>',ending); break;
     case 'ending': ending(); break;
-    case 'reset': Object.assign(state,{completed:0,collected:false,read:false,tokenInspected:false,started:false}); save(); launch(); break;
+    case 'reset': Object.assign(state,{completed:0,collected:false,read:false,tokenInspected:false,encounterPassed:false,started:false}); save(); launch(); break;
   }
 }
 // During a multi-touch walk Chromium can omit the compatibility click on the HUD.

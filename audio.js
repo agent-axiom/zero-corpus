@@ -1,6 +1,6 @@
 // The ventilation drone and recorder sounds are synthesised locally.
 export function createAudio() {
-  let ctx, master, drone;
+  let ctx, master, drone, footNoise;
   let enabled = true, volume = .55, inWorld = false, lastStep = 0;
 
   function apply() {
@@ -69,12 +69,41 @@ export function createAudio() {
       bell.start(start); bell.stop(start + .74);
     });
   }
+  function watcherStep(pan, distance) {
+    if (!enabled || !inWorld || !ctx || ctx.state !== 'running') return;
+    if (!footNoise) {
+      footNoise = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * .19), ctx.sampleRate);
+      const samples = footNoise.getChannelData(0);
+      for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
+    }
+    const at = ctx.currentTime, level = .38 / (1 + distance * distance * .025);
+    const position = ctx.createStereoPanner?.(), envelope = ctx.createGain();
+    if (position) {
+      position.pan.value = Math.max(-1, Math.min(1, pan));
+      envelope.connect(position); position.connect(master);
+    } else envelope.connect(master);
+    envelope.gain.setValueAtTime(.0001, at);
+    envelope.gain.exponentialRampToValueAtTime(level, at + .008);
+    envelope.gain.exponentialRampToValueAtTime(.0001, at + .27);
+    const impact = ctx.createOscillator();
+    impact.frequency.setValueAtTime(87, at);
+    impact.frequency.exponentialRampToValueAtTime(31, at + .21);
+    impact.connect(envelope);
+    const scrape = ctx.createBufferSource(), filter = ctx.createBiquadFilter();
+    scrape.buffer = footNoise;
+    filter.type = 'lowpass'; filter.frequency.value = 530; filter.Q.value = .5;
+    scrape.connect(filter); filter.connect(envelope);
+    scrape.onended = () => { scrape.disconnect(); filter.disconnect(); };
+    impact.onended = () => { impact.disconnect(); envelope.disconnect(); position?.disconnect(); };
+    impact.start(at); impact.stop(at + .28); scrape.start(at);
+  }
   return {
-    unlock, phoneRing,
+    unlock, phoneRing, watcherStep,
     settings(on, level) { enabled = on; volume = level; apply(); },
     inWorld(on) { inWorld = on; apply(); },
     pickup() { tone(620, .13, .07, 'sine', 930); },
     turnstile() { tone(165, .17, .17, 'sawtooth', 48); tone(330, .09, .07, 'triangle', 83); },
+    relay() { tone(1400, .028, .07, 'triangle', 360); tone(125, .13, .1, 'triangle', 45); },
     signal() { tone(275, .32, .09, 'triangle', 345); },
     threat() { tone(67, 1.5, .35, 'sawtooth', 43); },
     step() {

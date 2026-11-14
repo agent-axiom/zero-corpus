@@ -1,6 +1,7 @@
 // A low-resolution raycast view also runs on devices without a WebGL 2 context.
 import {CELL, HEIGHT} from './facility.js';
 import {gateAngle, POST} from './checkpoint.js';
+import {REPAIR} from './repair.js';
 
 function shade(rgb, light) {
   const word = Math.min(255, rgb[0] * light) | (Math.min(255, rgb[1] * light) << 8) | (Math.min(255, rgb[2] * light) << 16);
@@ -110,7 +111,7 @@ export function softwareView(canvas) {
     for (const o of facility.obstacles) {
       const isTable = Object.values(layout.points).some(p => Math.hypot(p.x - o.x, p.z - o.z) < .85);
       const reception = layout.opening && o.x === layout.rooms[0].x && o.z === layout.rooms[0].z;
-      if (isTable || reception || o.checkpoint) continue;
+      if (isTable || reception || o.checkpoint || o.repair) continue;
       const tall = Math.max(o.w, o.d) >= .57;
       const width = Math.max(.45, o.w * 1.7 + o.d * .55);
       sprite(o.x, .03, o.z, width, tall ? 1.65 : .60, tall ? '#485348' : '#686450');
@@ -166,6 +167,7 @@ export function softwareView(canvas) {
       for (const side of [-1, 1]) sprite(phone.x + side * .19, 1.22, phone.z - .05, .14, .115, '#202820');
       for (const z of [-29.95, -30.75, -31.55, -32.35]) sprite(0, .01, z, .10, .035, '#a48e60');
     } else for (const kind of ['item', 'clue', 'station']) {
+      if (facility.repair && kind === 'item') continue;
       const p = layout.points[kind];
       const width = kind === 'station' ? 1.30 : 1.65;
       sprite(p.x, .04, p.z, width * .84, .86, '#414941');
@@ -182,15 +184,61 @@ export function softwareView(canvas) {
       sprite(p.x, .02, p.z, .34, 2.22, '#181d19');
       sprite(p.x, 1.28, p.z, .55, .73, '#272b23');
     }
+    if (facility.repair) {
+      const {wallX, doorZ, windowZ, item} = REPAIR, repair = facility.repair;
+      // Side-facing panels preserve the doorway sightline while walking past.
+      function partition(z, width, bottom, height, color, alpha = 1) {
+        const a = project(wallX, z - width / 2), b = project(wallX, z + width / 2);
+        if (!a || !b) return;
+        const topA = horizon - (bottom + height - eye.y) * a.scale;
+        const topB = horizon - (bottom + height - eye.y) * b.scale;
+        sprites.push({x:Math.min(a.cx,b.cx),w:Math.abs(a.cx-b.cx),y:Math.min(topA,topB),
+          h:height * Math.max(a.scale,b.scale),d:(a.d+b.d)/2,color,alpha,
+          quad:[[a.cx,topA],[b.cx,topB],[b.cx,topB+height*b.scale],[a.cx,topA+height*a.scale]]});
+      }
+      for (const [z, width] of REPAIR.panels) partition(z,width,0,2.88,'#64705b');
+      partition(doorZ,1.60,2.64,.36,'#64705b');
+      partition(windowZ,1.25,0,1.08,'#64705b'); partition(windowZ,1.25,2.54,.34,'#64705b');
+      partition(windowZ,1.20,1.11,1.38,'#b9c7b7',.18);
+      for (let y = 1.16; y < 2.49; y += .045) partition(windowZ,1.18,y,.012,'#d2d5bd',.05);
+      for (const z of [windowZ-.625,windowZ+.625]) partition(z,.06,1.05,1.5,'#454d3e');
+      for (const y of [1.09,2.51]) partition(windowZ,1.3,y-.03,.065,'#454d3e');
+      for (const z of [-24.37,-22.73]) partition(z,.095,0,2.58,'#454d3e');
+      partition(doorZ,1.74,2.55,.12,'#454d3e');
+      sprite(-2.65,.02,-24.16,1.4,2.38,'#495442');
+      sprite(-2.65,1.13,-24.14,1.18,.88,'#a3b4a1');
+      sprite(wallX,2.70,doorZ,1.8,.36,'#354535','РЕМОНТНАЯ');
+      sprite(-1.71,.87,item.z,.65,.94,'#344236');
+      sprite(-1.55,1.0,item.z+.02,.52,.68,'#1f2a21');
+      sprite(-1.46,1.80,item.z+.03,.72,.25,'#384533','КЛЮЧНИЦА');
+      if (!collected) {
+        sprite(item.x,1.19,item.z+.07,.18,.31,'#c5ad71');
+        sprite(item.x,1.48,item.z+.08,.11,.10,'#aeb69a');
+      }
+      sprite(-1.44,2.16,item.z,.18,.18,
+        repair.phase === 'warning' ? (Math.cos(repair.time*7) > 0 ? '#ffd394' : '#b66f36')
+        : repair.phase === 'patrol' ? '#ef7549' : '#736145');
+      if (repair.shadow.visible) {
+        const p = repair.shadow.position;
+        sprite(p.x, .02, p.z, .28, 2.15, '#29342b');
+        sprite(p.x, 1.26, p.z, .46, .66, '#29342b');
+      }
+    }
     sprites.sort((a, b) => b.d - a.d);
     for (const s of sprites) {
       const first = Math.max(0, Math.floor(s.x)), last = Math.min(w, Math.ceil(s.x + s.w));
       ctx.fillStyle = s.color;
+      ctx.globalAlpha = s.alpha ?? 1;
       for (let i = first; i < last;) {
         if (depths[i] + .03 <= s.d) { i++; continue; }
         const begin = i++;
         while (i < last && depths[i] + .03 > s.d) i++;
-        if (s.face) {
+        if (s.quad) {
+          ctx.save(); ctx.beginPath(); ctx.rect(begin, s.y, i - begin, s.h); ctx.clip();
+          ctx.beginPath(); ctx.moveTo(...s.quad[0]);
+          for (const point of s.quad.slice(1)) ctx.lineTo(...point);
+          ctx.closePath(); ctx.fill(); ctx.restore();
+        } else if (s.face) {
           ctx.save(); ctx.beginPath(); ctx.rect(begin, s.y, i - begin, s.h); ctx.clip();
           ctx.drawImage(s.face, s.x, s.y, s.w, s.h);
           if (s.dim) {
@@ -199,6 +247,7 @@ export function softwareView(canvas) {
           ctx.restore();
         } else ctx.fillRect(begin, s.y, i - begin, s.h);
       }
+      ctx.globalAlpha = 1;
       const center = Math.round(s.x + s.w / 2);
       if (s.label && s.w >= 22 && center >= 0 && center < w && depths[center] + .03 > s.d) {
         ctx.font = 'bold ' + Math.max(4, Math.round(s.h * .47)) + 'px monospace';

@@ -2,6 +2,7 @@ import * as THREE from './vendor/three.module.min.js';
 import {buildFacility, buildWatcher, CELL, layoutFor, releaseScene} from './assets/world/facility.js';
 import {gateBlocks, POST} from './assets/world/checkpoint.js';
 import {softwareView} from './assets/world/software-view.js';
+import {advanceFirstEncounter, createFirstEncounter, FIRST_PATROL} from './assets/world/encounter.js';
 
 const EYE_HEIGHT = 1.62;
 const BODY_RADIUS = .24;
@@ -59,6 +60,7 @@ export function createWorld(container, callbacks = {}) {
   let collected = false, flashlight = true, focus = null;
   let sensitivity = 1, walkTime = 0, stepTime = 0, roomTime = 0, frame = 0, previousTime = 0;
   let hazardTime = 0, hazardPhase = 'idle', nextHazard = 38, patrolOrigin = 0, patrolLength = 0;
+  let firstEncounter = null;
   let mouseDown = false, wasLocked = false, ignoreUnlock = false, disposed = false;
   let lastSize = '';
   const events = new AbortController();
@@ -227,7 +229,54 @@ export function createWorld(container, callbacks = {}) {
       callbacks.onPhoneRing?.((dx * Math.cos(yaw) - dz * Math.sin(yaw)) / distance, distance);
     }
   }
+  function updateFirstEncounter(dt) {
+    const player = camera.position, key = layout.points.item;
+    const events = advanceFirstEncounter(firstEncounter, dt, {
+      collected, nearCabinet: Math.hypot(player.x - key.x, player.z - key.z) <= 5,
+      sheltered: Math.abs(player.x) >= CELL / 2 + .30, playerZ: player.z,
+    });
+    const {phase, time} = firstEncounter;
+    hazardPhase = phase === 'warning' || phase === 'patrol' ? phase : 'idle';
+    hazardTime = 0;
+    watcher.group.visible = phase === 'patrol';
+    if (phase === 'patrol') {
+      const z = FIRST_PATROL.origin + time * FIRST_PATROL.speed;
+      watcher.group.position.set(Math.sin(time * 1.8) * .065, .016 * Math.sin(time * 4), z);
+      for (const {pivot, sign} of watcher.limbs) pivot.rotation.x = sign * .29 * Math.sin(time * 4);
+      warningLight.position.set(0, 3.05, z - 1.4);
+      if (Math.abs(player.x) < CELL / 2 - .02 && Math.abs(z - player.z) < .84) {
+        pause(); callbacks.onFail?.(); return;
+      }
+    }
+    warningLight.intensity = phase === 'patrol' ? 2.1 : 0;
+    facility.repair?.setPhase(phase, time);
+    const messages = {
+      warning: 'Щёлкнуло реле у ключницы. Лампа мигает. Укройтесь за открытой дверью ремонтной.',
+      shadow: 'В матовом стекле прошла тень. Шаги приближаются по коридору.',
+      patrol: firstEncounter.sheltered
+        ? 'Обходчик проходит мимо. Оставайтесь за дверью и наблюдайте через окно.'
+        : 'Обходчик в коридоре. Укройтесь в ремонтной и дождитесь, пока он пройдёт.',
+      sheltered: 'Вы за дверью. Оставайтесь в комнате: Обходчик пройдёт мимо окна.',
+      exposed: 'Вы вышли из укрытия. Обходчик ещё в коридоре.',
+      passed: 'Шаги удалились и стихли. Можно выйти и продолжить сборку ключа.',
+      waiting: 'Шаги стихли. Вернитесь к ключнице у ремонтной и переждите следующий обход в комнате.',
+    };
+    const dx = watcher.group.position.x - player.x, dz = watcher.group.position.z - player.z;
+    const distance = Math.hypot(dx, dz, 1.3 - player.y);
+    const pan = (dx * Math.cos(camera.rotation.y) - dz * Math.sin(camera.rotation.y)) / Math.max(.1, distance);
+    for (const event of events) callbacks.onEncounter?.({phase: event, message: messages[event] || '',
+      sheltered: firstEncounter.sheltered, pan, distance});
+    if (events.includes('passed')) {
+      nextHazard = 38;
+      callbacks.onEncounterComplete?.();
+    }
+  }
   function updateHazard(dt) {
+    // The checkpoint teaches inspection. The first danger begins at the key cabinet.
+    if (layout.id <= 2) return;
+    if (firstEncounter && firstEncounter.phase !== 'passed') {
+      updateFirstEncounter(dt); return;
+    }
     hazardTime += dt;
     if (hazardPhase === 'idle' && hazardTime >= nextHazard) {
       hazardPhase = 'warning'; hazardTime = 0;
@@ -250,6 +299,7 @@ export function createWorld(container, callbacks = {}) {
       }
     }
     warningLight.intensity = hazardPhase === 'patrol' ? 6.5 : 0;
+    facility.repair?.setPhase(hazardPhase === 'idle' ? 'passed' : hazardPhase, hazardTime);
   }
   function updateLights() {
     const pos = camera.position;
@@ -306,11 +356,13 @@ export function createWorld(container, callbacks = {}) {
       document.exitPointerLock?.();
     }
   }
-  function start(mission) {
+  function start(mission, {encounterPassed = false} = {}) {
     if (disposed) return;
     pause(); clearLevel();
     layout = layoutFor(mission.id);
+    firstEncounter = mission.id === 3 ? createFirstEncounter(encounterPassed) : null;
     facility = buildFacility(mission, layout);
+    facility.repair?.setPhase(firstEncounter.phase, 0);
     watcher = buildWatcher(facility.mat); watcher.group.visible = false;
     scene.add(facility.group, watcher.group);
     const fog = new THREE.Color(0x262a24);
@@ -337,6 +389,7 @@ export function createWorld(container, callbacks = {}) {
   }
   return {
     start, advanceToClock, pause, resume,
+    getEncounterStatus() { return firstEncounter?.phase ?? null; },
     interact() {
       if (life !== 'running') return null;
       updateFocus();
@@ -366,6 +419,11 @@ export function createWorld(container, callbacks = {}) {
         item: 'Будка за турникетом, рабочий стол слева',
         clue: 'Самописец на правом столе в будке',
         station: 'Табельные часы в глубине будки, рядом с телефоном',
+      };
+      if (layout.id === 3) return {
+        item: 'Ключница на левой стене коридора у открытой двери ремонтной',
+        clue: 'Журнал слесаря в картотеке справа',
+        station: 'Сборочная оправка в торце коридора',
       };
       return {item: layout.rooms[layout.itemRoom].title, clue: layout.rooms[layout.clueRoom].title, station: 'Пост в торце центрального коридора'};
     },

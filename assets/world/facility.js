@@ -1,5 +1,6 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import {buildCheckpoint, POST} from './checkpoint.js';
+import {buildRepair, REPAIR} from './repair.js';
 import {labelMaterial, makeSurfaces, palettes, randomSource} from './surfaces.js';
 
 export const CELL = 3.65;
@@ -59,6 +60,7 @@ export function layoutFor(id) {
   };
   if (id === 1) Object.assign(points, {clue: POST.plate, station: POST.reader});
   if (id === 2) Object.assign(points, {item: POST.hand, clue: POST.tape, station: POST.clock});
+  if (id === 3) points.item = REPAIR.item;
   return {id, opening, chapter, cells, end, rooms, itemRoom, clueRoom, points,
     has(x, r) {return cells.has(key(x, r));},
     inside(x, z) {return cells.has(key(Math.floor(x / CELL + .5), Math.floor(-z / CELL + .5)));},
@@ -406,10 +408,18 @@ export function buildFacility(mission, layout) {
     });
   }
 
-  const item = itemModel(layout.opening ? 'Жетон' : mission.item, mat, layout.opening);
+  let repair = null;
+  if (layout.id === 3) {
+    const firstProp = obstacles.length;
+    repair = buildRepair({group, mat, box, round, block, mesh, sign, solid});
+    for (let i = firstProp; i < obstacles.length; i++) obstacles[i].repair = true;
+  }
+  const item = repair ? repair.key : itemModel(layout.opening ? 'Жетон' : mission.item, mat, layout.opening);
   const itemDesk = layout.rooms[layout.itemRoom];
-  item.position.set(itemDesk.x, .995, itemDesk.z);
-  item.rotation.y = itemDesk.rot - .18;
+  if (!repair) {
+    item.position.set(itemDesk.x, .995, itemDesk.z);
+    item.rotation.y = itemDesk.rot - .18;
+  }
   item.visible = mission.id !== 2;
   group.add(item);
 
@@ -503,7 +513,7 @@ export function buildFacility(mission, layout) {
     instance.computeBoundingSphere();
     group.add(instance);
   }
-  return {group, item, obstacles, lights, colors, mat, checkpoint};
+  return {group, item, obstacles, lights, colors, mat, checkpoint, repair};
 }
 
 export function buildWatcher(materials) {
