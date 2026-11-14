@@ -57,18 +57,20 @@ export const CHAPTER_SITES = {
 export const ARCHIVE_DOOR = {x: 1.95, y: 1.3, z: -8.94};
 export const EXIT_Z = -41.95;
 
-export function restoreChapter(raw, completed) {
-  const saved = raw && typeof raw === 'object' ? raw : {};
-  const p = saved.pose;
-  const pose =
-    p &&
+export function restoreChapterPose(p) {
+  return p &&
     ['x', 'z', 'yaw', 'pitch'].every((key) => Number.isFinite(p[key])) &&
     Math.abs(p.x) < 14 &&
     p.z > -46 &&
     p.z < 2 &&
     Math.abs(p.pitch) <= 1.08
-      ? {x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch}
-      : null;
+    ? {x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch}
+    : null;
+}
+
+export function restoreChapter(raw, completed) {
+  const saved = raw && typeof raw === 'object' ? raw : {};
+  const pose = restoreChapterPose(saved.pose);
   return {
     archiveOpen: typeof saved.archiveOpen === 'boolean' ? saved.archiveOpen : completed >= 3,
     relayReleased: saved.relayReleased === true && completed >= 9,
@@ -78,7 +80,7 @@ export function restoreChapter(raw, completed) {
 
 export function doorBlocks(door, x, z, radius = 0.24) {
   const angle = (door.progress * Math.PI) / 2;
-  const dx = door.axis === 'z' ? Math.sin(angle) : Math.cos(angle);
+  const dx = door.axis === 'z' ? Math.sin(angle) * (door.side ?? 1) : Math.cos(angle);
   const dz = door.axis === 'z' ? Math.cos(angle) : -Math.sin(angle);
   const px = x - door.hingeX,
     pz = z - door.hingeZ;

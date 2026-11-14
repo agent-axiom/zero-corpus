@@ -3,6 +3,7 @@ import {CELL, HEIGHT} from './facility.js';
 import {gateAngle, POST} from './checkpoint.js';
 import {REPAIR} from './repair.js';
 import {CHAPTER_SITES} from './chapter.js';
+import {SIGNAL_BOARD, SIGNAL_SITES} from './signals.js';
 
 function shade(rgb, light) {
   const word = Math.min(255, rgb[0] * light) | (Math.min(255, rgb[1] * light) << 8) | (Math.min(255, rgb[2] * light) << 16);
@@ -192,7 +193,7 @@ export function softwareView(canvas) {
       sprite(phone.x, 1.29, phone.z - .075, .45, .08, '#1d241e');
       for (const side of [-1, 1]) sprite(phone.x + side * .19, 1.22, phone.z - .05, .14, .115, '#202820');
       for (const z of [-29.95, -30.75, -31.55, -32.35]) sprite(0, .01, z, .10, .035, '#a48e60');
-    } else for (const kind of ['item', 'clue', 'station']) {
+    } else if (!facility.chapterScene) for (const kind of ['item', 'clue', 'station']) {
       if (facility.repair && kind === 'item') continue;
       const p = layout.points[kind];
       const width = kind === 'station' ? 1.30 : 1.65;
@@ -216,7 +217,7 @@ export function softwareView(canvas) {
           panel(door.x, door.z - 0.85, door.x, door.z + 0.85, 2.4, 0.46, '#5c6956');
         }
         const angle = (door.progress * Math.PI) / 2;
-        const dx = (door.axis === 'z' ? Math.sin(angle) : Math.cos(angle)) * door.span;
+        const dx = (door.axis === 'z' ? Math.sin(angle) * (door.side ?? 1) : Math.cos(angle)) * door.span;
         const dz = (door.axis === 'z' ? Math.cos(angle) : -Math.sin(angle)) * door.span;
         panel(door.hingeX, door.hingeZ, door.hingeX + dx, door.hingeZ + dz, 0, 2.4, '#435340');
         sprite(door.hingeX + dx * 0.65, 1.05, door.hingeZ + dz * 0.65, 0.09, 0.18, '#b4b39a');
@@ -231,7 +232,7 @@ export function softwareView(canvas) {
       }
       for (const [id, station] of chapter.stations) {
         const p = station.point,
-          site = CHAPTER_SITES[id],
+          site = CHAPTER_SITES[id] || SIGNAL_SITES[id],
           item = chapter.items.get(id);
         if (id !== 9) {
           sprite(p.x, 0.03, p.z - 0.17, 1.18, 1.1, '#505d4c');
@@ -251,7 +252,12 @@ export function softwareView(canvas) {
           sprite(site.item.x, site.item.y, site.item.z, 0.3, 0.11, id === 9 ? '#454431' : '#d5b47c');
         if (station.changed.visible) sprite(p.x, p.y - 0.04, p.z + 0.24, 0.4, 0.06, '#dccb92');
       }
-      if (chapter.keyInLock.visible) {
+      if (chapter.signalHouse) {
+        sprite(SIGNAL_BOARD.x,.63,SIGNAL_BOARD.z+.07,2.15,1.34,'#2c382c','',chapter.boardTexture.image);
+        sprite(1.6,2.51,-22.73,.35,.38,'#'+chapter.speaker.color.getHexString());
+        if(chapter.crossWire.visible) sprite(1.25,1.6,-25.18,.38,.025,'#b67e53');
+      }
+      if (chapter.keyInLock?.visible) {
         const archive = chapter.doors[0],
           angle = (archive.progress * Math.PI) / 2;
         sprite(

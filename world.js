@@ -4,6 +4,7 @@ import {gateBlocks, POST} from './assets/world/checkpoint.js';
 import {softwareView} from './assets/world/software-view.js';
 import {advanceFirstEncounter, createFirstEncounter, FIRST_PATROL} from './assets/world/encounter.js';
 import {ARCHIVE_DOOR, CHAPTER_SITES, EXIT_Z, restoreChapter} from './assets/world/chapter.js';
+import {SIGNAL_BOARD, SIGNAL_SITES, restoreSignals} from './assets/world/signals.js';
 
 const EYE_HEIGHT = 1.62;
 const BODY_RADIUS = .24;
@@ -335,7 +336,8 @@ export function createWorld(container, callbacks = {}) {
     for (let i = 0; i < steps && life === 'running'; i++) {
       updateGate(dt / steps); move(dt / steps); updateHazard(dt / steps);
     }
-    if (layout.opening && chapterState.relayReleased && camera.position.z < EXIT_Z - .9) {
+    const exitReady = layout.opening ? chapterState.relayReleased : layout.signalHouse && chapterState.exitReleased;
+    if (exitReady && camera.position.z < EXIT_Z - .9) {
       callbacks.onChapterExit?.();
       return;
     }
@@ -368,18 +370,23 @@ export function createWorld(container, callbacks = {}) {
   function syncChapter(instant = false) {
     if (!facility.chapterScene) return;
     facility.chapterScene.apply(chapterCompleted, chapterState, layout.id, collected, instant);
+    if (layout.signalHouse) {
+      facility.item.visible = false;
+      if (layout.id !== 11) layout.points.switchboard = SIGNAL_BOARD;
+      return;
+    }
     facility.item.visible = chapterCompleted < 1 && !(layout.id === 1 && collected);
     facility.checkpoint.looseHand.visible = chapterCompleted < 2 && !(layout.id === 2 && collected);
     facility.checkpoint.minuteHand.visible = chapterCompleted >= 2;
     delete layout.points.door;
     if (layout.id >= 3 && !chapterState.archiveOpen) layout.points.door = ARCHIVE_DOOR;
   }
-  function start(mission, {encounterPassed = false, chapter = null, completed = mission.id - 1} = {}) {
+  function start(mission, {encounterPassed = false, chapter = null, signals = null, completed = mission.id - 1} = {}) {
     if (disposed) return;
     pause(); clearLevel();
     layout = layoutFor(mission.id);
     chapterCompleted = completed;
-    chapterState = restoreChapter(chapter, completed);
+    chapterState = layout.signalHouse ? restoreSignals(signals, completed) : restoreChapter(chapter, completed);
     firstEncounter = mission.id === 3 ? createFirstEncounter(encounterPassed) : null;
     facility = buildFacility(mission, layout);
     facility.repair?.setPhase(firstEncounter?.phase ?? 'passed', 0);
@@ -393,27 +400,27 @@ export function createWorld(container, callbacks = {}) {
     camera.position.set(0, EYE_HEIGHT, spawnZ); camera.rotation.set(-.012, 0, 0, 'YXZ');
     collected = false; walkTime = 0; stepTime = .28; roomTime = 0;
     hazardTime = 0; hazardPhase = 'idle'; warningLight.intensity = 0;
-    patrolOrigin = layout.opening ? POST.spawnZ + 1.85 : -layout.end * CELL;
+    patrolOrigin = layout.opening ? POST.spawnZ + 1.85 : layout.signalHouse ? -36.8 : -layout.end * CELL;
     nextHazard = 43 - layout.chapter; patrolLength = (1.75 - patrolOrigin) / 2.05;
     syncChapter(true);
-    const pose = layout.opening && chapterState.pose;
+    const pose = facility.chapterScene && chapterState.pose;
     if (pose && canStand(pose.x, pose.z) && facility.chapterScene.canRestorePose(pose) &&
-        (facility.checkpoint.active || pose.z >= POST.gateZ)) {
+        (!facility.checkpoint || facility.checkpoint.active || pose.z >= POST.gateZ)) {
       camera.position.set(pose.x, EYE_HEIGHT, pose.z);
       camera.rotation.set(pose.pitch, pose.yaw, 0, 'YXZ');
     }
     setFocus(null); updateLights(); render(); resume();
   }
   function advanceChapter(mission, completed, chapter) {
-    if (!layout.opening || mission.id > 10) return;
+    if (!facility.chapterScene || Math.floor((mission.id - 1) / 10) !== layout.chapter) return;
     layout = layoutFor(mission.id);
     chapterCompleted = completed;
-    chapterState = restoreChapter(chapter, completed);
+    chapterState = layout.signalHouse ? restoreSignals(chapter, completed) : restoreChapter(chapter, completed);
     collected = false;
     firstEncounter = mission.id === 3 ? createFirstEncounter(false) : null;
     watcher.group.visible = false; warningLight.intensity = 0;
     hazardPhase = 'idle'; hazardTime = 0; nextHazard = 43;
-    facility.repair.setPhase(firstEncounter?.phase ?? 'passed', 0);
+    facility.repair?.setPhase(firstEncounter?.phase ?? 'passed', 0);
     syncChapter(); setFocus(null);
   }
   function advanceToClock(mission) {
@@ -432,9 +439,12 @@ export function createWorld(container, callbacks = {}) {
   }
   return {
     start, advanceToClock, advanceChapter, pause, resume,
-    applyChapter(chapter) { chapterState = restoreChapter(chapter, chapterCompleted); syncChapter(); },
-    getChapterPose() {
-      if (!layout?.opening) return null;
+    applyChapter(chapter) {
+      chapterState = layout.signalHouse ? restoreSignals(chapter, chapterCompleted) : restoreChapter(chapter, chapterCompleted);
+      syncChapter();
+    },
+    getChapterPose(missionId = layout?.id) {
+      if (!facility?.chapterScene || Math.floor((missionId - 1) / 10) !== layout.chapter) return null;
       return {x: camera.position.x, z: camera.position.z, yaw: camera.rotation.y, pitch: camera.rotation.x};
     },
     getEncounterStatus() { return firstEncounter?.phase ?? null; },
@@ -477,6 +487,14 @@ export function createWorld(container, callbacks = {}) {
         item: layout.id === 9 ? 'Открытый шкаф в приёмной' : CHAPTER_SITES[layout.id].room,
         clue: layout.id === 9 ? 'Запись у ночного звонка в будке' : CHAPTER_SITES[layout.id].room,
         station: layout.id === 9 ? 'Телефон в будке дежурного' : CHAPTER_SITES[layout.id].room,
+      };
+      if (layout.id === 17) return {
+        item: 'Кабины связи', clue: 'Схема кросса в коридоре', station: 'Разделительный кросс в коридоре',
+      };
+      if (SIGNAL_SITES[layout.id]) return {
+        item: layout.id === 18 ? 'Монтажная' : layout.id === 20 ? 'Телефонный архив' : SIGNAL_SITES[layout.id].room,
+        clue: layout.id === 18 ? 'Журнал импульсов в коммутаторной' : layout.id === 20 ? 'Сводка у микшера в коридоре' : SIGNAL_SITES[layout.id].room,
+        station: layout.id === 18 ? 'Телефонный диск у двери архива' : layout.id === 20 ? 'Микшер перед выходом' : SIGNAL_SITES[layout.id].room,
       };
       return {item: layout.rooms[layout.itemRoom].title, clue: layout.rooms[layout.clueRoom].title, station: 'Пост в торце центрального коридора'};
     },

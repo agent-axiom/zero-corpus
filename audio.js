@@ -97,8 +97,79 @@ export function createAudio() {
     impact.onended = () => { impact.disconnect(); envelope.disconnect(); position?.disconnect(); };
     impact.start(at); impact.stop(at + .28); scrape.start(at);
   }
+  function previewLine(index) {
+    unlock();
+    if (!enabled || !ctx || ctx.state !== 'running') return () => {};
+    const at = ctx.currentTime,
+      nodes = [],
+      sources = [];
+    const bus = ctx.createGain();
+    bus.gain.value = 0.55;
+    bus.connect(master);
+    nodes.push(bus);
+    function envelope() {
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.connect(bus);
+      nodes.push(gain);
+      return gain;
+    }
+    function tap(time, hz, duration, level) {
+      const source = ctx.createOscillator(),
+        gain = envelope();
+      source.frequency.setValueAtTime(hz, time);
+      source.frequency.exponentialRampToValueAtTime(hz * 0.35, time + duration);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(level, time + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+      source.connect(gain);
+      source.start(time);
+      source.stop(time + duration);
+      sources.push(source);
+      nodes.push(source);
+    }
+    if (index === 0 || index === 1) {
+      const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 1.3), ctx.sampleRate),
+        samples = buffer.getChannelData(0);
+      for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
+      const source = ctx.createBufferSource(),
+        filter = ctx.createBiquadFilter(),
+        gain = envelope();
+      source.buffer = buffer;
+      filter.type = 'bandpass';
+      filter.frequency.value = index === 0 ? 1250 : 620;
+      filter.Q.value = 0.65;
+      source.connect(filter);
+      filter.connect(gain);
+      sources.push(source);
+      nodes.push(source, filter);
+      const begin = index === 0 ? at : at + 0.65;
+      gain.gain.setValueAtTime(0.0001, begin);
+      gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.22 : 0.28, begin + 0.09);
+      if (index === 0) gain.gain.setValueAtTime(0.22, at + 1.15);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 1.27);
+      source.start(at);
+      source.stop(at + 1.3);
+      if (index === 1) tap(at + 0.27, 88, 0.23, 0.25);
+    } else for (let hit = 0; hit < 5; hit++) tap(at + 0.08 + hit * 0.24, 1150, 0.04, 0.12);
+    let stopped = false;
+    const timer = setTimeout(stop, 1500);
+    function stop() {
+      if (stopped) return;
+      stopped = true;
+      clearTimeout(timer);
+      for (const source of sources) {
+        try {
+          source.stop();
+        } catch {}
+      }
+      for (const node of nodes) node.disconnect();
+    }
+    return stop;
+  }
+
   return {
-    unlock, phoneRing, watcherStep,
+    unlock, phoneRing, watcherStep, previewLine,
     phoneReply() { phoneRing(0, 4); phoneRing(0, 4, true, .98); },
     settings(on, level) { enabled = on; volume = level; apply(); },
     inWorld(on) { inWorld = on; apply(); },

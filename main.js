@@ -3,6 +3,8 @@ import {createAudio} from './audio.js';
 import {mountInstrument} from './instruments.js';
 import {mountToken} from './token.js';
 import {restoreChapter} from './assets/world/chapter.js';
+import {SIGNAL_SITES, restoreSignals} from './assets/world/signals.js';
+import {mountSwitchboard} from './switchboard.js';
 
 const $ = selector => document.querySelector(selector);
 const icon = name => '<svg aria-hidden="true"><use href="#i-' + name + '"/></svg>';
@@ -25,16 +27,19 @@ const state = {
 };
 const settings = {sound: cfg.sound !== false, volume: range(cfg.volume, 0, 1, .6), sensitivity: range(cfg.sensitivity, .3, 2, 1), grain: cfg.grain !== false};
 state.chapter = restoreChapter(raw.chapter, state.completed);
+state.signals = restoreSignals(raw.signals, state.completed);
 const audio = createAudio();
 const dialog = $('#dialog'), body = $('#dialog-body');
 let world, playing = false, loading = false, light = true, overlay = '', onDismiss = null;
 let hintTimeout, archiveChapter = 1, archiveMission = 1, launchTime = performance.now(), failure = false;
 let encounterSheltered = false;
+let sheetCleanup = null;
 const current = () => missions[Math.min(state.completed, missions.length - 1)];
 const chapterOf = mission => chapters.find(ch => ch.id === mission.chapter);
 const finished = () => state.completed === missions.length;
 function save() {
-  if (playing && current().id <= 10) state.chapter.pose = world?.getChapterPose() ?? state.chapter.pose;
+  if (playing && current().id <= 10) state.chapter.pose = world?.getChapterPose(current().id) ?? state.chapter.pose;
+  else if (playing && current().id <= 20) state.signals.pose = world?.getChapterPose(current().id) ?? state.signals.pose;
   write(saveKey, state); refreshMenu();
 }
 function refreshMenu() {
@@ -59,6 +64,7 @@ function clock() {
   $('#timer').textContent = stamp; $('#game-clock').textContent = stamp;
 }
 function clearSheet() {
+  sheetCleanup?.(); sheetCleanup = null;
   onDismiss = null; overlay = '';
   if (dialog.open) dialog.close();
   body.replaceChildren();
@@ -69,6 +75,7 @@ function dismiss() {
   clearSheet(); next();
 }
 function showSheet(type, kicker, title, html, back = () => {}) {
+  sheetCleanup?.(); sheetCleanup = null;
   overlay = type; onDismiss = back;
   dialog.classList.toggle('archive', type === 'archive');
   $('#dialog-kicker').textContent = kicker;
@@ -87,7 +94,7 @@ function notice(message, ms = 4400) {
 function focusOn(kind) {
   const m = current();
   const clueName = m.id === 1 ? 'Прочитать табличку' : m.id === 2 ? 'Прочитать контрольную ленту' : state.read ? 'Перечитать улику' : 'Изучить улику';
-  const label = {item: m.item, clue: clueName, station: m.station, door: 'Открыть архив ключом смены'}[kind];
+  const label = {item: m.item, clue: clueName, station: m.station, door: 'Открыть архив ключом смены', switchboard: 'Подключиться к коммутатору'}[kind];
   $('#focus-hint').hidden = !label; $('#focus-hint span').textContent = label || '';
   $('#game').classList.toggle('focused', Boolean(label));
 }
@@ -113,6 +120,13 @@ function objectiveFor(m) {
   }
   if (m.id === 4 && !state.chapter.archiveOpen) return 'Открыть архив собранным ключом';
   if (m.id === 10 && state.chapter.relayReleased) return 'Пройти через открытый шлюз за будкой';
+  if (m.id === 20 && state.signals.exitReleased) return 'Пройти через шлюз в Архив смены';
+  if (SIGNAL_SITES[m.id]) {
+    const rooms = world?.getLocations() || {};
+    if (!state.collected) return 'Найти предмет · ' + m.item + ' / ' + rooms.item;
+    if (!state.read) return 'Прочитать запись · ' + rooms.clue;
+    return m.id === 11 ? 'Прослушать линии и найти начало записи' : m.station + ' · ' + rooms.station;
+  }
   if (m.id <= 10) {
     const rooms = world?.getLocations() || {};
     if (!state.collected) return {
@@ -159,8 +173,9 @@ async function launch() {
         onFail: lost, onPause: () => { if (playing && !dialog.open && !failure) pauseMenu(); },
         onMove: () => audio.step(),
         onChapterExit: () => {
-          if (current().id !== 10 || !state.chapter.relayReleased) return;
-          state.completed = 10; state.collected = false; state.read = false;
+          const id = current().id;
+          if (!(id === 10 && state.chapter.relayReleased || id === 20 && state.signals.exitReleased)) return;
+          state.completed = id; state.collected = false; state.read = false;
           save(); launch();
         },
         onEncounter: event => {
@@ -185,13 +200,15 @@ async function launch() {
     playing = true; failure = false; light = true; encounterSheltered = false; focusOn(null);
     $('#terminal').hidden = true; $('#game').hidden = false;
     world.setSensitivity(settings.sensitivity); world.start(current(), {
-      encounterPassed: state.encounterPassed, chapter: state.chapter, completed: state.completed,
+      encounterPassed: state.encounterPassed, chapter: state.chapter, signals: state.signals, completed: state.completed,
     });
     world.setCollected(state.collected); world.setClueRead?.(state.read); world.setFlashlight(light);
     audio.inWorld(true); state.started = true; save(); updateHud();
     if (current().id === 3 && state.collected && !state.encounterPassed) notice('Бородка ключа сохранена. Вернитесь к ключнице у ремонтной.', 0);
     else if (current().id === 4 && !state.chapter.archiveOpen) notice('Собранный ключ с вами. Архив находится справа от входа в проходную.', 5500);
     else if (current().id === 10 && state.chapter.relayReleased) notice('Реле включено. Пройдите через открытый шлюз в Дом связи.', 0);
+    else if (current().id === 20 && state.signals.exitReleased) notice('Три дорожки совмещены. Шлюз в Архив смены открыт.', 0);
+    else if (current().id === 11) notice('Коммутаторная слева. Найдите гарнитуру и пометку Нины, затем подключитесь к линиям.', 6500);
     else if (current().id === 2) notice('Турникет открыт. Часы горят в будке за ним.', 3900);
     else notice(firstVisit ? (matchMedia('(pointer:coarse)').matches ? 'Слева — ходьба, справа — обзор. Цель и записи доступны в журнале.' : 'WASD — ходьба · Щёлкните в сцене для обзора · E — осмотреть · J — журнал') : 'Полевой журнал восстановлен', firstVisit ? 7500 : 2400);
   } catch (error) {
@@ -231,15 +248,47 @@ function journal() {
   pauseWorld();
   const m = current(), rooms = world.getLocations?.() || {};
   const goal = (name, done, room) => '<li class="' + (done ? 'done' : '') + '"><i class="mark">' + (done ? icon('check') : '') + '</i><span>' + escape(name) + (room ? ' <small class="micro"> / ' + escape(room) + '</small>' : '') + '</span></li>';
-  const note = state.read ? '<div class="note-paper"><span class="micro">ЗАПИСАННАЯ УЛИКА</span><p>' + escape(m.clue) + '</p></div>' : '';
+  const note = (state.read ? '<div class="note-paper"><span class="micro">ЗАПИСАННАЯ УЛИКА</span><p>' + escape(m.clue) + '</p></div>' : '') +
+    (m.id === 20 && state.signals.exitReleased ? '<div class="note-paper"><span class="micro">ВОССТАНОВЛЕННАЯ ЗАПИСЬ</span><p>' + escape(m.resolution) + '</p></div>' : '');
   const clueName = m.id === 1 ? 'Табличка проходов' : m.id === 2 ? 'Контрольная лента' : 'Улика';
   const hasToken = m.id === 1 && state.collected;
   const mark = hasToken ? goal(state.tokenInspected ? 'На обороте одна косая насечка' : 'Осмотреть оборот жетона', state.tokenInspected) : '';
   const inspect = hasToken ? button('inspect-token','Осмотреть жетон','secondary') : '';
   const encounter = m.id === 3 && state.collected ? goal('Переждать обход в ремонтной',state.encounterPassed,'За открытой дверью слева от ключницы') : '';
   const key = m.id >= 4 && m.id <= 10 ? goal('Ключ смены собран',true) + goal('Дверь архива открыта',state.chapter.archiveOpen,'Справа в начале коридора') : '';
-  showSheet('journal','ПОЛЕВОЙ ЖУРНАЛ / МИССИЯ ' + pad(m.id),m.title,'<p>' + escape(m.brief) + '</p><ul class="goal-list">' + key + goal(m.item,state.collected,rooms.item) + mark + encounter + goal(clueName,state.read,rooms.clue) + goal(m.station,false,rooms.station) + '</ul>' + note + '<div class="actions">' + inspect + button('resume','Вернуться в корпус '+icon('next')) + '</div>',resumeWorld);
+  const line = m.id >= 12 && m.id <= 20 ? goal('Начало записи снято с линии II',true,'Коммутатор доступен для повторного прослушивания') : '';
+  showSheet('journal','ПОЛЕВОЙ ЖУРНАЛ / МИССИЯ ' + pad(m.id),m.title,'<p>' + escape(m.brief) + '</p><ul class="goal-list">' + key + line + goal(m.item,state.collected,rooms.item) + mark + encounter + goal(clueName,state.read,rooms.clue) + goal(m.station,false,rooms.station) + '</ul>' + note + '<div class="actions">' + inspect + button('resume','Вернуться в корпус '+icon('next')) + '</div>',resumeWorld);
 }
+function switchboard(monitor = false) {
+  pauseWorld();
+  showSheet(
+    monitor ? 'switchboard' : 'puzzle',
+    'ДОМ СВЯЗИ / КОНТРОЛЬ ЛИНИЙ',
+    'Коммутатор смены',
+    '<details class="note-paper"><summary>Пометка Нины</summary><p>' +
+      escape(missions[10].clue) +
+      '</p></details>' +
+      (!settings.sound ? '<p class="sw-muted">Звук выключен · смотрите осциллограмму.</p>' : '') +
+      '<div id="switchboard-panel"></div><p class="error" role="status" id="puzzle-status"></p><div class="actions">' +
+      button('resume', 'Отложить гарнитуру', 'secondary') +
+      '</div>',
+    resumeWorld,
+  );
+  sheetCleanup = mountSwitchboard($('#switchboard-panel'), {
+    state: state.signals,
+    monitor,
+    onChange: (patch) => {
+      Object.assign(state.signals, patch);
+      save();
+      world.applyChapter(state.signals);
+      const status = $('#puzzle-status');
+      if (status) status.textContent = '';
+    },
+    onListen: (index) => audio.previewLine(index),
+    onSubmit: (index) => solve(index),
+  });
+}
+
 function inspectToken(back = resumeWorld) {
   if (current().id !== 1 || !state.collected) return;
   pauseWorld();
@@ -253,6 +302,7 @@ function inspectToken(back = resumeWorld) {
 function interact(kind) {
   if (!playing || dialog.open || failure || finished()) return;
   const m = current();
+  if (kind === 'switchboard') { switchboard(true); return; }
   if (kind === 'door') {
     if (state.completed < 3) { notice('Замок архива требует собранный ключ смены. Оправка стоит в ремонтной.'); return; }
     state.chapter.archiveOpen = true; save(); world.applyChapter(state.chapter);
@@ -270,6 +320,7 @@ function interact(kind) {
     const title = m.id === 1 ? 'Табличка проходов' : m.id === 2 ? 'Контрольная лента' : 'Полевая запись';
     showSheet('clue','УЛИКА / ДЕЛО ' + pad(m.id),title,'<div class="note-paper"><p class="lead">' + escape(m.clue) + '</p></div><div class="actions">' + button('resume','Убрать в журнал '+icon('file')) + '</div>',resumeWorld);
   } else if (kind === 'station') {
+    if (m.id === 20 && state.signals.exitReleased) { notice('Дорожки совмещены. Пройдите через открытый шлюз.', 0); return; }
     if (m.id === 10 && state.chapter.relayReleased) { notice('Реле уже включено. Выход открыт за будкой.', 0); return; }
     if (m.id === 3 && state.collected && !state.encounterPassed) {
       notice('Обходчик ещё рядом. Переждите его за дверью ремонтной, затем вернитесь к оправке.', 0);
@@ -279,6 +330,7 @@ function interact(kind) {
     if (!state.collected || !state.read) {
       notice(m.id <= 2 ? objectiveFor(m) : !state.collected ? 'Нужен предмет · ' + m.item : 'Сначала найдите улику. Ориентир есть в журнале.'); return;
     }
+    if (m.id === 11) { switchboard(); return; }
     pauseWorld();
     showSheet('puzzle','УЗЕЛ ДОСТУПА / МИССИЯ ' + pad(m.id),m.station,'<p class="lead">' + escape(m.prompt) + '</p><details class="note-paper"><summary>Свериться с уликой</summary><p>' + escape(m.clue) + '</p></details><div class="options">' + m.options.map((v,i) => '<button class="option" data-answer="' + i + '"><small>' + pad(i+1,2) + '</small> ' + escape(v) + '</button>').join('') + '</div><p class="error" role="status" id="puzzle-status"></p>',resumeWorld);
     mountInstrument(body.querySelector('.options'), m, index => solve(index));
@@ -287,13 +339,17 @@ function interact(kind) {
 function solve(index, target) {
   if (overlay !== 'puzzle') return false;
   const m = current();
+  if (m.id === 11 && (!state.signals.heard[index] || state.signals.selectedLine !== index)) {
+    $('#puzzle-status').textContent = 'Подключите гарнитуру и дослушайте выбранную линию.';
+    return false;
+  }
   if (index !== m.answer) {
     if (m.id === 1 && index < 0) {
       $('#puzzle-status').textContent = 'Сначала выберите приёмник.';
       return false;
     }
     if (target) target.disabled = true;
-    $('#puzzle-status').textContent = m.id === 1
+    $('#puzzle-status').textContent = m.id === 11 ? 'На этой линии нет начала записи. Сверьтесь с пометкой Нины.' : m.id === 1
       ? 'Турникет вернул жетон. Сверьте насечку с табличкой проходов.'
       : 'Цепь не замкнулась. Сверьтесь с уликой и попробуйте ещё раз.';
     audio.signal(); return false;
@@ -303,15 +359,21 @@ function solve(index, target) {
     resumeWorld(); audio.turnstile(); notice('Реле включено. Пройдите через открытый шлюз за будкой.', 0);
     return true;
   }
+  if (m.id === 20) {
+    state.signals.exitReleased = true; save(); world.applyChapter(state.signals);
+    resumeWorld(); audio.relay(); notice(m.resolution + ' Шлюз в Архив смены открыт.',9000);
+    return true;
+  }
   state.completed = m.id; state.read = false; state.collected = false; state.tokenInspected = false; save(); notice(''); focusOn(null);
   if (m.id === 1) {
     world.advanceToClock(current()); resumeWorld(); audio.turnstile();
     return true;
   }
-  if (m.id < 10) {
-    world.advanceChapter(current(), state.completed, state.chapter);
+  if (m.id < 20) {
+    world.advanceChapter(current(), state.completed, m.id < 10 ? state.chapter : state.signals);
     resumeWorld(); audio.pickup();
     if (m.id === 5 || m.id === 6) audio.relay();
+    if ([11,13,17,18].includes(m.id)) audio.relay();
     if (m.id === 9) audio.phoneReply();
     notice(m.resolution + ' ' + objectiveFor(current()) + '.', 8000);
     return true;
@@ -350,7 +412,7 @@ function doAction(action) {
     case 'interact': if (playing && !dialog.open && !world.interact()) notice('Подойдите ближе и направьте прицел на предмет.',1800); break;
     case 'new': showSheet('reset','НОВАЯ КАССЕТА','Стереть прохождение?','<p>Прогресс всех 100 миссий будет сброшен.</p><div class="actions">' + button('reset','Стереть и войти') + button('ending','Отмена','quiet') + '</div>',ending); break;
     case 'ending': ending(); break;
-    case 'reset': Object.assign(state,{completed:0,collected:false,read:false,tokenInspected:false,encounterPassed:false,started:false,chapter:restoreChapter(null,0)}); save(); launch(); break;
+    case 'reset': Object.assign(state,{completed:0,collected:false,read:false,tokenInspected:false,encounterPassed:false,started:false,chapter:restoreChapter(null,0),signals:restoreSignals(null,0)}); save(); launch(); break;
   }
 }
 // During a multi-touch walk Chromium can omit the compatibility click on the HUD.
@@ -394,4 +456,4 @@ document.addEventListener('keydown', event => {
 });
 document.addEventListener('visibilitychange',() => { if (document.hidden && playing && !dialog.open) pauseMenu(); });
 applySettings(); refreshMenu(); clock(); setInterval(clock,1000);
-setInterval(() => { if (playing && !dialog.open && current().id <= 10) save(); }, 4000);
+setInterval(() => { if (playing && !dialog.open && current().id <= 20) save(); }, 4000);
