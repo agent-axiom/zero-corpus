@@ -4,6 +4,7 @@ import {buildRepair} from './repair.js';
 import {buildChapter, CHAPTER_SITES} from './chapter.js';
 import {buildSignalHouse, SIGNAL_SITES} from './signals.js';
 import {buildArchiveWing, ARCHIVE_SITES} from './archive.js';
+import {buildWaterWorks, WATER_SITES} from './water.js';
 import {labelMaterial, makeSurfaces, palettes, randomSource} from './surfaces.js';
 
 export const CELL = 3.65;
@@ -13,7 +14,7 @@ const roomSigns = [
   ['ПРИЁМНАЯ', 'АРХИВ', 'РЕМОНТНАЯ', 'КАРТОТЕКА'],
   ['КОММУТАТОРНАЯ', 'МОНТАЖНАЯ', 'КАБИНЫ СВЯЗИ', 'ТЕЛЕФОННЫЙ АРХИВ'],
   ['ЧИТАЛЬНЫЙ ЗАЛ', 'ПЕРЕПЛЁТНАЯ', 'УЧЁТ СМЕНЫ', 'СПЕЦХРАН'],
-  ['НАСОСНАЯ', 'ФИЛЬТРЫ', 'МАСТЕРСКАЯ', 'ДРЕНАЖ'],
+  ['НАСОСНАЯ', 'ФИЛЬТРОВАЛЬНАЯ', 'МАСТЕРСКАЯ', 'ДРЕНАЖ'],
   ['ПРИЁМНАЯ', 'ПАЛАТА 7', 'ПРОЦЕДУРНАЯ', 'ИЗОЛЯТОР'],
   ['ЧЕРТЁЖНАЯ', 'ОТЛИВКА', 'СБОРКА', 'МОДЕЛЬНАЯ'],
   ['ДЕТСКАЯ', 'КВАРТИРА 7', 'КОРИДОР', 'КУХНЯ'],
@@ -26,7 +27,7 @@ export function layoutFor(id) {
   const chapter = Math.max(0, Math.min(9, Math.floor((id - 1) / 10)));
   const cells = new Map();
   const put = (x, r) => cells.set(key(x, r), [x, r]);
-  const end = chapter <= 2 ? 12 : 10 + (chapter % 2);
+  const end = chapter <= 3 ? 12 : 10 + (chapter % 2);
   for (let r = 0; r <= end; r++) put(0, r);
   const rooms = [];
   for (let tier = 0; tier < 2; tier++) {
@@ -45,7 +46,7 @@ export function layoutFor(id) {
     }
   }
   // In the later sectors a service passage loops around one side of the spine.
-  if (chapter >= 3) {
+  if (chapter >= 4) {
     const side = chapter % 2 ? 1 : -1;
     for (let r = 3; r <= 7; r++) put(side * 2, r);
   }
@@ -53,9 +54,10 @@ export function layoutFor(id) {
   const opening = chapter === 0;
   const signalHouse = chapter === 1;
   const archiveWing = chapter === 2;
+  const waterWing = chapter === 3;
   if (opening) for (const row of [9, 10, 11]) for (const side of [-1, 1]) put(side, row);
 
-  const itemRoom = opening || signalHouse || archiveWing ? 0 : (id - 1) % rooms.length;
+  const itemRoom = opening || signalHouse || archiveWing || waterWing ? 0 : (id - 1) % rooms.length;
   const clueRoom = (itemRoom + 1 + Math.floor((id - 1) / 4) % 3) % rooms.length;
   const point = room => ({x: room.x, z: room.z, yaw: room.rot});
   const points = {
@@ -65,11 +67,11 @@ export function layoutFor(id) {
   };
   if (id === 1) Object.assign(points, {clue: POST.plate, station: POST.reader});
   if (id === 2) Object.assign(points, {item: POST.hand, clue: POST.tape, station: POST.clock});
-  if (CHAPTER_SITES[id] || SIGNAL_SITES[id] || ARCHIVE_SITES[id]) {
-    const {item, clue, station} = CHAPTER_SITES[id] || SIGNAL_SITES[id] || ARCHIVE_SITES[id];
+  if (CHAPTER_SITES[id] || SIGNAL_SITES[id] || ARCHIVE_SITES[id] || WATER_SITES[id]) {
+    const {item, clue, station} = CHAPTER_SITES[id] || SIGNAL_SITES[id] || ARCHIVE_SITES[id] || WATER_SITES[id];
     Object.assign(points, {item, clue, station});
   }
-  return {id, opening, signalHouse, archiveWing, chapter, cells, end, rooms, itemRoom, clueRoom, points,
+  return {id, opening, signalHouse, archiveWing, waterWing, chapter, cells, end, rooms, itemRoom, clueRoom, points,
     has(x, r) {return cells.has(key(x, r));},
     inside(x, z) {return cells.has(key(Math.floor(x / CELL + .5), Math.floor(-z / CELL + .5)));},
   };
@@ -143,7 +145,7 @@ export function buildFacility(mission, layout) {
   const group = new THREE.Group();
   const colors = palettes[layout.chapter];
   const mat = makeSurfaces(colors, layout.chapter);
-  const rand = randomSource((layout.opening ? 1 : layout.signalHouse ? 11 : layout.archiveWing ? 21 : mission.id) * 37 + 51);
+  const rand = randomSource((layout.opening ? 1 : layout.signalHouse ? 11 : layout.archiveWing ? 21 : layout.waterWing ? 31 : mission.id) * 37 + 51);
   const box = new THREE.BoxGeometry(1, 1, 1);
   const round = new THREE.CylinderGeometry(.5, .5, 1, 10);
   const plane = new THREE.PlaneGeometry(1, 1);
@@ -362,7 +364,7 @@ export function buildFacility(mission, layout) {
     lamp(side * (span - .3) * CELL, z, 1.35);
     at(x, z, rot, () => {
       const back = -CELL * .35 + .09;
-      const hasFireDoor = i !== layout.itemRoom && (layout.opening || layout.signalHouse || layout.archiveWing || i !== layout.clueRoom);
+      const hasFireDoor = i !== layout.itemRoom && (layout.opening || layout.signalHouse || layout.archiveWing || layout.waterWing || i !== layout.clueRoom);
       const frameHeight = 2.32;
       const signHeight = .57;
       const signY = hasFireDoor ? frameHeight + .10 + signHeight / 2 : 2.28;
@@ -404,7 +406,7 @@ export function buildFacility(mission, layout) {
         }
         solid(sideX, -.49, 1.42, .75);
       }
-      if (!layout.opening && !layout.signalHouse && !layout.archiveWing) roomEquipment(layout.chapter, -sideX, i);
+      if (!layout.opening && !layout.signalHouse && !layout.archiveWing && !layout.waterWing) roomEquipment(layout.chapter, -sideX, i);
       if (hasFireDoor) {
         // A locked, inset fire door with a wheel and a faded inspection plate.
         block(mat.trim, 0, frameHeight / 2, back, 1.44, frameHeight, .11);
@@ -426,7 +428,7 @@ export function buildFacility(mission, layout) {
   const itemDesk = layout.rooms[layout.itemRoom];
   item.position.set(itemDesk.x, .995, itemDesk.z);
   item.rotation.y = itemDesk.rot - .18;
-  item.visible = mission.id === 1 || !layout.opening && !layout.signalHouse && !layout.archiveWing;
+  item.visible = mission.id === 1 || !layout.opening && !layout.signalHouse && !layout.archiveWing && !layout.waterWing;
   group.add(item);
 
   const station = layout.points.station;
@@ -449,6 +451,10 @@ export function buildFacility(mission, layout) {
   } else if (layout.archiveWing) {
     const firstProp = obstacles.length;
     chapterScene = buildArchiveWing({group, mat, box, round, plane, block, mesh, sign, solid, at, table});
+    for (let i = firstProp; i < obstacles.length; i++) obstacles[i].chapterProp = true;
+  } else if (layout.waterWing) {
+    const firstProp = obstacles.length;
+    chapterScene = buildWaterWorks({group, mat, box, round, plane, block, mesh, sign, solid, at, table});
     for (let i = firstProp; i < obstacles.length; i++) obstacles[i].chapterProp = true;
   } else at(station.x, station.z, 0, () => {
     const stationName = String(mission.station || 'Контроль');

@@ -1,0 +1,290 @@
+.water-panel {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid #627e72;
+  background: linear-gradient(130deg, #243c33, #172721);
+  color: #e2dec7;
+}
+.wp-title {
+  font: 600 18px var(--mono);
+  line-height: 1.4;
+  margin: 0 0 16px;
+}
+.wp-network {
+  position: relative;
+}
+.wp-drawing svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #142820;
+  border: 1px solid #465c4b;
+  overflow: visible;
+}
+.wp-pipe {
+  fill: none;
+  stroke: #687d6c;
+  stroke-width: 10;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.wp-flow {
+  stroke: #88cfc4;
+  stroke-dasharray: 13 9;
+  animation: water-flow 1.6s linear infinite;
+}
+.wp-riser-controls {
+  position: absolute;
+  inset: 25% 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.wp-valve {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 92px;
+  padding: 8px 3px;
+  border: 1px solid transparent;
+  background: #142820d9;
+}
+.wp-valve b {
+  font: 600 13px var(--mono);
+  line-height: 1.4;
+}
+.wp-valve small {
+  font: 10px var(--mono);
+  color: #d2c4a3;
+}
+.wp-valve[aria-pressed='true'] {
+  border-color: #89c7aa;
+  background: #304e39;
+}
+.wp-valve[aria-pressed='true'] small {
+  color: #c9e4bb;
+}
+.wp-wheel {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 40px;
+  border: 4px solid #c78c67;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 3px #162a20;
+  transform: rotate(0deg);
+}
+.wp-wheel:before,
+.wp-wheel:after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 31px;
+  height: 4px;
+  background: #c78c67;
+  transform: translate(-50%, -50%);
+}
+.wp-wheel:after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+.wp-valve[aria-pressed='true'] .wp-wheel {
+  transform: rotate(45deg);
+  border-color: #b7cea0;
+}
+.wp-three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 12px 0;
+}
+.wp-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+.wp-controls button {
+  flex: 1;
+  min-height: 48px;
+  padding: 10px;
+  font-size: 13px;
+}
+.wp-instruction {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #c0c7b1;
+}
+.wp-state {
+  min-height: 52px;
+  padding: 12px;
+  border-left: 2px solid #a1c8aa;
+  background: #0f211a;
+  font: 13px/1.6 var(--mono);
+  overflow-wrap: anywhere;
+}
+.wp-commit {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 8px;
+  padding: 12px;
+  font-size: 14px;
+}
+.wp-gauge {
+  fill: #d2d5bd;
+  stroke: #809681;
+  stroke-width: 8;
+}
+.wp-ticks {
+  fill: none;
+  stroke: #43533f;
+  stroke-width: 3;
+}
+.wp-needle {
+  fill: none;
+  stroke: #a64c32;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.wp-hub {
+  fill: #344a37;
+}
+.wp-gauge-value {
+  fill: #273b2a;
+  font: 700 30px monospace;
+  text-anchor: middle;
+}
+.wp-svg-label {
+  fill: #d2d6be;
+  font: 12px monospace;
+  text-anchor: middle;
+}
+.wp-height {
+  fill: #e1dcc1;
+  font: 700 15px monospace;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: #142820;
+  stroke-width: 4px;
+}
+.wp-hot {
+  fill: none;
+  stroke: #9d7152;
+  stroke-width: 8;
+}
+.wp-shut {
+  fill: none;
+  stroke: #d19c78;
+  stroke-width: 6;
+}
+.wp-compass {
+  position: relative;
+  width: 100%;
+  height: 255px;
+  background: #182e24;
+  border: 1px solid #627e72;
+  display: grid;
+  place-items: center;
+}
+.wp-compass > span {
+  position: absolute;
+  font: 11px var(--mono);
+  letter-spacing: 1px;
+}
+.wp-north {
+  top: 14px;
+}
+.wp-south {
+  bottom: 14px;
+}
+.wp-west {
+  left: 9px;
+}
+.wp-east {
+  right: 9px;
+}
+.wp-pump {
+  padding: 12px;
+  touch-action: none;
+  border-radius: 50%;
+  background: #243a2d;
+}
+.wp-wheel--large {
+  width: 140px;
+  height: 140px;
+  border-width: 9px;
+  transform: rotate(var(--turn, 0deg));
+}
+.wp-wheel--large:before,
+.wp-wheel--large:after {
+  width: 124px;
+  height: 8px;
+}
+.wp-wheel--large i {
+  position: absolute;
+  left: calc(50% - 5px);
+  top: -10px;
+  height: 20px;
+  width: 10px;
+  background: #ebe3b8;
+  z-index: 1;
+}
+.wp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.wp-tabs button {
+  min-height: 44px;
+  font-size: 12px;
+  padding: 8px;
+}
+.wp-tabs [aria-pressed='true'] {
+  border-color: #aad6ac;
+  background: #34523a;
+}
+.water-panel button:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+@keyframes water-flow {
+  to {
+    stroke-dashoffset: -44;
+  }
+}
+@media (max-width: 380px) {
+  .water-panel {
+    padding: 12px;
+  }
+  .wp-compass {
+    height: 235px;
+  }
+  .wp-wheel--large {
+    width: 118px;
+    height: 118px;
+  }
+  .wp-wheel--large:before,
+  .wp-wheel--large:after {
+    width: 100px;
+  }
+  .wp-riser-controls {
+    inset: 22% 0 auto;
+  }
+  .wp-valve {
+    gap: 4px;
+  }
+  .wp-wheel:not(.wp-wheel--large) {
+    width: 34px;
+    height: 34px;
+  }
+  .wp-wheel:not(.wp-wheel--large):before,
+  .wp-wheel:not(.wp-wheel--large):after {
+    width: 25px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wp-flow {
+    animation: none;
+  }
+}

@@ -5,6 +5,7 @@ import {REPAIR} from './repair.js';
 import {CHAPTER_SITES} from './chapter.js';
 import {SIGNAL_BOARD, SIGNAL_SITES} from './signals.js';
 import {ARCHIVE_CAROUSEL, ARCHIVE_SITES} from './archive.js';
+import {WATER_SITES} from './water.js';
 
 function shade(rgb, light) {
   const word = Math.min(255, rgb[0] * light) | (Math.min(255, rgb[1] * light) << 8) | (Math.min(255, rgb[2] * light) << 16);
@@ -233,7 +234,7 @@ export function softwareView(canvas) {
       }
       for (const [id, station] of chapter.stations) {
         const p = station.point,
-          site = CHAPTER_SITES[id] || SIGNAL_SITES[id] || ARCHIVE_SITES[id],
+          site = CHAPTER_SITES[id] || SIGNAL_SITES[id] || ARCHIVE_SITES[id] || WATER_SITES[id],
           item = chapter.items.get(id);
         if (id !== 9) {
           sprite(p.x, 0.03, p.z - 0.17, 1.18, 1.1, '#505d4c');
@@ -252,6 +253,15 @@ export function softwareView(canvas) {
         if (item?.visible && id !== 3)
           sprite(site.item.x, site.item.y, site.item.z, 0.3, 0.11, id === 9 ? '#454431' : '#d5b47c');
         if (station.changed.visible) sprite(p.x, p.y - 0.04, p.z + 0.24, 0.4, 0.06, '#dccb92');
+        if (station.texture) sprite(p.x,1.2,p.z+.25,id===31?2.13:1.23,.82,'#213c36','',station.texture.image);
+      }
+      if (chapter.waterWing) {
+        if(chapter.flooded) sprite(0,.018,-23.8,3.2,.06,'#547c76');
+        else for(let i=0;i<10;i++) sprite(i%2?.17:-.17,.024,-24-i*.52,.12,.025,'#27372e');
+        sprite(-6.7,.05,-25.4,.85,1.4,'#23392f','БАК');
+        sprite(-6.7,.22,-25.35,.6,chapter.completed>=37?.28:.85,'#78a3a0');
+        if(chapter.firstFragment.visible) sprite(4.7,1.2,-14.98,.2,.07,'#ded2ad');
+        if(chapter.secondFragment.visible) sprite(10.3,1.2,-29.48,.22,.08,'#ded2ad');
       }
       if (chapter.archiveWing) {
         sprite(ARCHIVE_CAROUSEL.x,.45,ARCHIVE_CAROUSEL.z+.07,1.6,1.9,'#384638','',chapter.carouselTexture.image);
