@@ -4,6 +4,7 @@ import {gateAngle, POST} from './checkpoint.js';
 import {REPAIR} from './repair.js';
 import {CHAPTER_SITES} from './chapter.js';
 import {SIGNAL_BOARD, SIGNAL_SITES} from './signals.js';
+import {ARCHIVE_CAROUSEL, ARCHIVE_SITES} from './archive.js';
 
 function shade(rgb, light) {
   const word = Math.min(255, rgb[0] * light) | (Math.min(255, rgb[1] * light) << 8) | (Math.min(255, rgb[2] * light) << 16);
@@ -232,7 +233,7 @@ export function softwareView(canvas) {
       }
       for (const [id, station] of chapter.stations) {
         const p = station.point,
-          site = CHAPTER_SITES[id] || SIGNAL_SITES[id],
+          site = CHAPTER_SITES[id] || SIGNAL_SITES[id] || ARCHIVE_SITES[id],
           item = chapter.items.get(id);
         if (id !== 9) {
           sprite(p.x, 0.03, p.z - 0.17, 1.18, 1.1, '#505d4c');
@@ -251,6 +252,11 @@ export function softwareView(canvas) {
         if (item?.visible && id !== 3)
           sprite(site.item.x, site.item.y, site.item.z, 0.3, 0.11, id === 9 ? '#454431' : '#d5b47c');
         if (station.changed.visible) sprite(p.x, p.y - 0.04, p.z + 0.24, 0.4, 0.06, '#dccb92');
+      }
+      if (chapter.archiveWing) {
+        sprite(ARCHIVE_CAROUSEL.x,.45,ARCHIVE_CAROUSEL.z+.07,1.6,1.9,'#384638','',chapter.carouselTexture.image);
+        sprite(10.4,.02,-25.7,1.2,2,'#314233',chapter.completed>=27?'19 / ОТКРЫТ':'19');
+        if(chapter.envelope.visible) sprite(10.4,1.02,-25.25,.55,.06,'#d5c8a6');
       }
       if (chapter.signalHouse) {
         sprite(SIGNAL_BOARD.x,.63,SIGNAL_BOARD.z+.07,2.15,1.34,'#2c382c','',chapter.boardTexture.image);

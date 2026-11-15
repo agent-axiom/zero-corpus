@@ -1,0 +1,120 @@
+.carousel {
+  margin: 24px 0 12px;
+}
+.cr-funds {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.cr-funds button {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 6px;
+}
+.cr-funds [aria-pressed='true'] {
+  border-color: var(--accent, #d4a66b);
+  color: #edcea2;
+  background: #3d4030;
+}
+.cr-machine {
+  padding: 14px;
+  background: linear-gradient(105deg, #394535, #202b22 65%, #172119);
+  border: 2px solid #727b59;
+  box-shadow:
+    inset 9px 0 0 #111b1450,
+    inset -9px 0 0 #111b1450;
+  touch-action: pan-y;
+}
+.cr-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #e1d6b5;
+  letter-spacing: 3px;
+  padding: 0 0 12px;
+}
+.cr-heading button {
+  font-size: 24px;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 4px;
+}
+.cr-drawers {
+  display: grid;
+  gap: 8px;
+}
+.cr-drawer {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  width: 100%;
+  min-height: 87px;
+  padding: 12px;
+  border: 1px solid #727a5d;
+  background: linear-gradient(#465240, #2a352b);
+  color: #e4d9b8;
+  box-shadow: 0 5px 0 #101810;
+}
+.cr-drawer span {
+  background: #d3c7a4;
+  color: #293024;
+  font: 700 17px var(--mono, monospace);
+  padding: 4px 22px;
+}
+.cr-drawer small {
+  font: 11px var(--mono, monospace);
+  letter-spacing: 1px;
+  color: #d0c8a6;
+}
+.cr-drawer i {
+  width: 56px;
+  height: 9px;
+  border: 2px solid #a9a68d;
+  border-top: 0;
+}
+.cr-drawer[aria-pressed='true'] {
+  outline: 2px solid #d4a66b;
+  outline-offset: -3px;
+}
+.cr-drawer.cr-opened {
+  transform: translateY(3px);
+  background: linear-gradient(#796b4b, #49523d);
+  box-shadow:
+    0 3px 0 #101810,
+    inset 0 8px 0 #171e16;
+}
+.cr-instruction,
+.cr-history {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #b8bca4;
+}
+.cr-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.cr-controls button {
+  flex: 1;
+  min-height: 48px;
+}
+.cr-document h3 {
+  margin: 12px 0;
+  font-size: 21px;
+}
+.cr-document p {
+  line-height: 1.7;
+  margin-bottom: 0;
+}
+.cr-commit {
+  width: 100%;
+  min-height: 50px;
+  margin: 10px 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cr-drawer {
+    transform: none !important;
+  }
+}

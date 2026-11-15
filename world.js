@@ -5,6 +5,7 @@ import {softwareView} from './assets/world/software-view.js';
 import {advanceFirstEncounter, createFirstEncounter, FIRST_PATROL} from './assets/world/encounter.js';
 import {ARCHIVE_DOOR, CHAPTER_SITES, EXIT_Z, restoreChapter} from './assets/world/chapter.js';
 import {SIGNAL_BOARD, SIGNAL_SITES, restoreSignals} from './assets/world/signals.js';
+import {ARCHIVE_CAROUSEL, ARCHIVE_SITES, restoreArchive} from './assets/world/archive.js';
 
 const EYE_HEIGHT = 1.62;
 const BODY_RADIUS = .24;
@@ -63,7 +64,7 @@ export function createWorld(container, callbacks = {}) {
   let sensitivity = 1, walkTime = 0, stepTime = 0, roomTime = 0, frame = 0, previousTime = 0;
   let hazardTime = 0, hazardPhase = 'idle', nextHazard = 38, patrolOrigin = 0, patrolLength = 0;
   let firstEncounter = null;
-  let chapterState = null, chapterCompleted = 0;
+  let chapterState = null, chapterCompleted = 0, restoreState = restoreChapter;
   let mouseDown = false, wasLocked = false, ignoreUnlock = false, disposed = false;
   let lastSize = '';
   const events = new AbortController();
@@ -336,7 +337,7 @@ export function createWorld(container, callbacks = {}) {
     for (let i = 0; i < steps && life === 'running'; i++) {
       updateGate(dt / steps); move(dt / steps); updateHazard(dt / steps);
     }
-    const exitReady = layout.opening ? chapterState.relayReleased : layout.signalHouse && chapterState.exitReleased;
+    const exitReady = layout.opening ? chapterState.relayReleased : (layout.signalHouse || layout.archiveWing) && chapterState.exitReleased;
     if (exitReady && camera.position.z < EXIT_Z - .9) {
       callbacks.onChapterExit?.();
       return;
@@ -370,6 +371,11 @@ export function createWorld(container, callbacks = {}) {
   function syncChapter(instant = false) {
     if (!facility.chapterScene) return;
     facility.chapterScene.apply(chapterCompleted, chapterState, layout.id, collected, instant);
+    if (layout.archiveWing) {
+      facility.item.visible = false;
+      if (layout.id !== 21) layout.points.carousel = ARCHIVE_CAROUSEL;
+      return;
+    }
     if (layout.signalHouse) {
       facility.item.visible = false;
       if (layout.id !== 11) layout.points.switchboard = SIGNAL_BOARD;
@@ -381,12 +387,13 @@ export function createWorld(container, callbacks = {}) {
     delete layout.points.door;
     if (layout.id >= 3 && !chapterState.archiveOpen) layout.points.door = ARCHIVE_DOOR;
   }
-  function start(mission, {encounterPassed = false, chapter = null, signals = null, completed = mission.id - 1} = {}) {
+  function start(mission, {encounterPassed = false, chapter = null, signals = null, archive = null, completed = mission.id - 1} = {}) {
     if (disposed) return;
     pause(); clearLevel();
     layout = layoutFor(mission.id);
     chapterCompleted = completed;
-    chapterState = layout.signalHouse ? restoreSignals(signals, completed) : restoreChapter(chapter, completed);
+    restoreState = [restoreChapter, restoreSignals, restoreArchive][layout.chapter] || restoreChapter;
+    chapterState = restoreState([chapter, signals, archive][layout.chapter], completed);
     firstEncounter = mission.id === 3 ? createFirstEncounter(encounterPassed) : null;
     facility = buildFacility(mission, layout);
     facility.repair?.setPhase(firstEncounter?.phase ?? 'passed', 0);
@@ -400,7 +407,7 @@ export function createWorld(container, callbacks = {}) {
     camera.position.set(0, EYE_HEIGHT, spawnZ); camera.rotation.set(-.012, 0, 0, 'YXZ');
     collected = false; walkTime = 0; stepTime = .28; roomTime = 0;
     hazardTime = 0; hazardPhase = 'idle'; warningLight.intensity = 0;
-    patrolOrigin = layout.opening ? POST.spawnZ + 1.85 : layout.signalHouse ? -36.8 : -layout.end * CELL;
+    patrolOrigin = layout.opening ? POST.spawnZ + 1.85 : (layout.signalHouse || layout.archiveWing) ? -36.8 : -layout.end * CELL;
     nextHazard = 43 - layout.chapter; patrolLength = (1.75 - patrolOrigin) / 2.05;
     syncChapter(true);
     const pose = facility.chapterScene && chapterState.pose;
@@ -415,7 +422,7 @@ export function createWorld(container, callbacks = {}) {
     if (!facility.chapterScene || Math.floor((mission.id - 1) / 10) !== layout.chapter) return;
     layout = layoutFor(mission.id);
     chapterCompleted = completed;
-    chapterState = layout.signalHouse ? restoreSignals(chapter, completed) : restoreChapter(chapter, completed);
+    chapterState = restoreState(chapter, completed);
     collected = false;
     firstEncounter = mission.id === 3 ? createFirstEncounter(false) : null;
     watcher.group.visible = false; warningLight.intensity = 0;
@@ -440,7 +447,7 @@ export function createWorld(container, callbacks = {}) {
   return {
     start, advanceToClock, advanceChapter, pause, resume,
     applyChapter(chapter) {
-      chapterState = layout.signalHouse ? restoreSignals(chapter, chapterCompleted) : restoreChapter(chapter, chapterCompleted);
+      chapterState = restoreState(chapter, chapterCompleted);
       syncChapter();
     },
     getChapterPose(missionId = layout?.id) {
@@ -490,6 +497,11 @@ export function createWorld(container, callbacks = {}) {
       };
       if (layout.id === 17) return {
         item: 'Кабины связи', clue: 'Схема кросса в коридоре', station: 'Разделительный кросс в коридоре',
+      };
+      if (ARCHIVE_SITES[layout.id]) return {
+        item: layout.id === 30 ? 'Спецхран' : ARCHIVE_SITES[layout.id].room,
+        clue: layout.id === 30 ? 'Запись перед световым столом у выхода' : ARCHIVE_SITES[layout.id].room,
+        station: layout.id === 30 ? 'Световой стол перед выходом в водомерный узел' : ARCHIVE_SITES[layout.id].room,
       };
       if (SIGNAL_SITES[layout.id]) return {
         item: layout.id === 18 ? 'Монтажная' : layout.id === 20 ? 'Телефонный архив' : SIGNAL_SITES[layout.id].room,
