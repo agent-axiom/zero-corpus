@@ -137,7 +137,7 @@ export function softwareView(canvas) {
     for (const o of facility.obstacles) {
       const isTable = Object.values(layout.points).some(p => Math.hypot(p.x - o.x, p.z - o.z) < .85);
       const reception = layout.opening && o.x === layout.rooms[0].x && o.z === layout.rooms[0].z;
-      if (isTable || reception || o.checkpoint || o.repair || o.chapterProp) continue;
+      if (isTable || reception || o.checkpoint || o.repair || o.chapterProp || o.documentProp) continue;
       const tall = Math.max(o.w, o.d) >= .57;
       const width = Math.max(.45, o.w * 1.7 + o.d * .55);
       sprite(o.x, .03, o.z, width, tall ? 1.65 : .60, tall ? '#485348' : '#686450');
@@ -209,6 +209,22 @@ export function softwareView(canvas) {
         sprite(p.x, 1.20, p.z + .06, .62, .37, '#7eaa78');
       }
     }
+    for (const fixture of facility.documents) {
+      const {point:p, base, height, width, type, anchor:a} = fixture;
+      const bottom = p.y-height/2;
+      if (type === 'floor') {
+        for (const side of [-1,1]) {
+          const x=p.x+side*Math.min(.2,width*.32);
+          sprite(x,.035,p.z-.055,.045,bottom,'#788174');
+          sprite(x,.014,p.z-.045,.085,.04,'#8e9483');
+        }
+      } else {
+        sprite(a.x,base,a.z-.05,.04,Math.max(.04,bottom-base+.025),'#788174');
+        sprite(a.x,base,a.z-.035,.32,.036,'#8e9483');
+      }
+      sprite(p.x,bottom-.025,p.z,width+.045,height+.05,'#7f8a74');
+      sprite(p.x,bottom,p.z+.01,width,height,eye.z>=p.z?'#c9c1a4':'#626f5e',eye.z>=p.z?'ЗАПИСЬ':'');
+    }
     if (facility.chapterScene) {
       const chapter = facility.chapterScene;
       for (const door of chapter.doors) {
@@ -249,8 +265,8 @@ export function softwareView(canvas) {
           id === 9 ? 0.1 : 0.38,
           station.changed.visible ? '#abc987' : '#9b6843',
         );
+        for(const side of [-1,1]) sprite(p.x+side*.35,1.12,p.z-.17,.026,.67,'#788174');
         sprite(p.x, 1.76, p.z - 0.12, 1.6, 0.37, '#344532', station.label);
-        sprite(site.clue.x, site.clue.y - 0.3, site.clue.z, 0.86, 0.6, '#c9c1a4', 'ЗАПИСЬ');
         if (item?.visible && id !== 3)
           sprite(site.item.x, site.item.y, site.item.z, 0.3, 0.11, id === 9 ? '#454431' : '#d5b47c');
         if (station.changed.visible) sprite(p.x, p.y - 0.04, p.z + 0.24, 0.4, 0.06, '#dccb92');

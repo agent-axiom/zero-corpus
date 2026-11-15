@@ -138,6 +138,8 @@ export function buildArchiveWing({
   solid,
   at,
   table,
+  document: mountDocument,
+  instrumentLabel,
 }) {
   const items = new Map(),
     stations = new Map();
@@ -194,18 +196,7 @@ export function buildArchiveWing({
     );
     if ([24, 26, 29, 30].includes(id)) add(item, mat.dark, 0, 0.055, 0, 0.22, 0.025, 0.06);
     items.set(id, item);
-    block(mat.dark, site.clue.x, site.clue.y, site.clue.z - 0.04, 0.9, 0.64, 0.07);
-    sign(
-      'ЗАПИСЬ АРХИВАРИУСА',
-      mission.clue,
-      site.clue.x,
-      site.clue.y,
-      site.clue.z,
-      0.86,
-      0.6,
-      0,
-      'paper',
-    );
+    mountDocument(site.clue, 'ЗАПИСЬ АРХИВАРИУСА', mission.clue);
     const changed = new THREE.Group();
     changed.position.set(s.x, s.y, s.z + 0.27);
     group.add(changed);
@@ -215,7 +206,7 @@ export function buildArchiveWing({
       solid(s.x, s.z - 0.18, 1.3, 0.65);
       block(mat.steel, s.x, 1.15, s.z - 0.12, 1.4, 0.08, 0.8);
       mesh(plane, face, s.x, s.y, s.z + 0.21, 0.94, 0.4, 1);
-      sign(mission.station.toUpperCase(), 'АРХИВ / ' + id, s.x, 2.1, s.z - 0.12, 1.8, 0.37);
+      instrumentLabel(mission.station.toUpperCase(), 'АРХИВ / ' + id, s.x, 2.1, s.z - 0.12, 1.8, 0.37);
       add(
         changed,
         labelMaterial(labels[id], 'ВНЕСЕНО В ДЕЛО', 'screen'),

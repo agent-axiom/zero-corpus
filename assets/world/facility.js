@@ -7,6 +7,7 @@ import {buildArchiveWing, ARCHIVE_SITES} from './archive.js';
 import {buildWaterWorks, WATER_SITES} from './water.js';
 import {buildSanitaryFloor, SANITARY_SITES} from './sanitary.js';
 import {labelMaterial, makeSurfaces, palettes, randomSource} from './surfaces.js';
+import {documentMount, buildDocumentHolder, buildInstrumentLabel} from './documents.js';
 
 export const CELL = 3.65;
 export const HEIGHT = 3.35;
@@ -152,7 +153,7 @@ export function buildFacility(mission, layout) {
   const round = new THREE.CylinderGeometry(.5, .5, 1, 10);
   const plane = new THREE.PlaneGeometry(1, 1);
   const batches = new Map();
-  const lights = [], obstacles = [];
+  const lights = [], obstacles = [], documentRequests = [], documents = [];
   const transform = new THREE.Object3D();
   const scope = {x: 0, z: 0, yaw: 0};
   const place = (x, z) => [scope.x + x * Math.cos(scope.yaw) + z * Math.sin(scope.yaw),
@@ -177,12 +178,14 @@ export function buildFacility(mission, layout) {
   function sign(text, sub, x, y, z, w, h, yaw = 0, type = 'sign') {
     mesh(plane, labelMaterial(text, sub, type), x, y, z, w, h, 1, yaw);
   }
-  function solid(x, z, w, d) {
+  function solid(x, z, w, d, supportTop) {
     mesh(plane, mat.ao, x, .006, z, w + .73, d + .73, 1, 0, -Math.PI / 2);
     const [wx, wz] = place(x, z);
     const flipped = Math.abs(Math.sin(scope.yaw)) > .5;
-    obstacles.push({x: wx, z: wz, w: (flipped ? d : w) / 2, d: (flipped ? w : d) / 2});
+    obstacles.push({x: wx, z: wz, w: (flipped ? d : w) / 2, d: (flipped ? w : d) / 2, supportTop});
   }
+  const mountDocument = (point, title, text) => documentRequests.push({point, title, text});
+  const instrumentLabel = (...args) => buildInstrumentLabel({mat, block, sign}, ...args);
   function lamp(x, z, w = 1.7) {
     block(mat.dark, x, HEIGHT - .055, z, w + .24, .11, .47);
     block(mat.zinc, x, HEIGHT - .12, z, w + .14, .04, .38);
@@ -200,7 +203,7 @@ export function buildFacility(mission, layout) {
     for (const x of [-.70, .70]) for (const z of [-.30, .30])
       block(mat.steel, x, .42, z, .055, .84, .055);
     block(mat.dark, 0, .22, -.29, 1.42, .05, .045);
-    solid(0, 0, 1.57, .77);
+    solid(0, 0, 1.57, .77, .985);
   }
   function lightBox(x, y, z, m) {
     block(mat.dark, x, y, z, .19, .21, .105);
@@ -444,23 +447,23 @@ export function buildFacility(mission, layout) {
     checkpoint.active = mission.id >= 2;
     checkpoint.setProgress(checkpoint.active ? 1 : 0);
     const firstChapterProp = obstacles.length;
-    chapterScene = buildChapter({group, mat, box, round, plane, block, mesh, sign, solid, at, table, repair});
+    chapterScene = buildChapter({group, mat, box, round, plane, block, mesh, sign, solid, at, table, repair, document: mountDocument, instrumentLabel});
     for (let i = firstChapterProp; i < obstacles.length; i++) obstacles[i].chapterProp = true;
   } else if (layout.signalHouse) {
     const firstProp = obstacles.length;
-    chapterScene = buildSignalHouse({group, mat, box, round, plane, block, mesh, sign, solid, at, table});
+    chapterScene = buildSignalHouse({group, mat, box, round, plane, block, mesh, sign, solid, at, table, document: mountDocument, instrumentLabel});
     for (let i = firstProp; i < obstacles.length; i++) obstacles[i].chapterProp = true;
   } else if (layout.archiveWing) {
     const firstProp = obstacles.length;
-    chapterScene = buildArchiveWing({group, mat, box, round, plane, block, mesh, sign, solid, at, table});
+    chapterScene = buildArchiveWing({group, mat, box, round, plane, block, mesh, sign, solid, at, table, document: mountDocument, instrumentLabel});
     for (let i = firstProp; i < obstacles.length; i++) obstacles[i].chapterProp = true;
   } else if (layout.waterWing) {
     const firstProp = obstacles.length;
-    chapterScene = buildWaterWorks({group, mat, box, round, plane, block, mesh, sign, solid, at, table});
+    chapterScene = buildWaterWorks({group, mat, box, round, plane, block, mesh, sign, solid, at, table, document: mountDocument, instrumentLabel});
     for (let i = firstProp; i < obstacles.length; i++) obstacles[i].chapterProp = true;
   } else if (layout.sanitaryWing) {
     const firstProp = obstacles.length;
-    chapterScene = buildSanitaryFloor({group, mat, box, round, plane, block, mesh, sign, solid, at, table});
+    chapterScene = buildSanitaryFloor({group, mat, box, round, plane, block, mesh, sign, solid, at, table, document: mountDocument, instrumentLabel});
     for (let i = firstProp; i < obstacles.length; i++) obstacles[i].chapterProp = true;
   } else at(station.x, station.z, 0, () => {
     const stationName = String(mission.station || 'Контроль');
@@ -537,13 +540,21 @@ export function buildFacility(mission, layout) {
     }
   }
 
+  for (const request of documentRequests) {
+    const mount = documentMount(request.point, obstacles);
+    const firstProp = obstacles.length;
+    buildDocumentHolder({mat, block, sign, solid}, mount, request.title, request.text);
+    for (let i = firstProp; i < obstacles.length; i++) obstacles[i].documentProp = true;
+    documents.push(mount);
+  }
+
   for (const {geometry, material, matrices} of batches.values()) {
     const instance = new THREE.InstancedMesh(geometry, material, matrices.length);
     matrices.forEach((matrix, i) => instance.setMatrixAt(i, matrix));
     instance.computeBoundingSphere();
     group.add(instance);
   }
-  return {group, item, obstacles, lights, colors, mat, checkpoint, repair, chapterScene};
+  return {group, item, obstacles, lights, colors, mat, checkpoint, repair, chapterScene, documents};
 }
 
 export function buildWatcher(materials) {

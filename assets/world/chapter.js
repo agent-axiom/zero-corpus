@@ -101,6 +101,8 @@ export function buildChapter({
   at,
   table,
   repair,
+  document: mountDocument,
+  instrumentLabel,
 }) {
   const items = new Map([[3, repair.key]]),
     stations = new Map(),
@@ -194,19 +196,7 @@ export function buildChapter({
       add(item, mat.zinc, 0, 0.08, 0, 0.2, 0.03, 0.12);
       items.set(id, item);
     }
-    const c = site.clue;
-    block(mat.dark, c.x, c.y, c.z - 0.045, 0.9, 0.64, 0.07);
-    sign(
-      id === 3 ? 'ЖУРНАЛ СЛЕСАРЯ' : id === 7 ? 'СЛЕДЫ НА СТЕКЛЕ' : 'ЗАПИСЬ СМЕНЫ',
-      mission.clue,
-      c.x,
-      c.y,
-      c.z,
-      0.86,
-      0.6,
-      0,
-      'paper',
-    );
+    mountDocument(site.clue, id === 3 ? 'ЖУРНАЛ СЛЕСАРЯ' : id === 7 ? 'СЛЕДЫ НА СТЕКЛЕ' : 'ЗАПИСЬ СМЕНЫ', mission.clue);
     const p = site.station;
     if (id !== 9) {
       block(mat.paint, p.x, 0.55, p.z - 0.17, 1.18, 1.1, 0.63);
@@ -224,7 +214,7 @@ export function buildChapter({
       id === 9 ? 0.1 : 0.38,
       1,
     );
-    sign(
+    instrumentLabel(
       mission.station.toUpperCase(),
       'ПОСТ ' + String(id).padStart(2, '0'),
       p.x,

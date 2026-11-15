@@ -89,7 +89,7 @@ export function restoreSignals(raw, completed) {
   };
 }
 
-export function buildSignalHouse({group, mat, box, round, plane, block, mesh, sign, solid, at, table}) {
+export function buildSignalHouse({group, mat, box, round, plane, block, mesh, sign, solid, at, table, document: mountDocument, instrumentLabel}) {
   const items = new Map(),
     stations = new Map();
   const add = (parent, material, x, y, z, w, h, d, geometry = box) => {
@@ -122,9 +122,7 @@ export function buildSignalHouse({group, mat, box, round, plane, block, mesh, si
       add(item, mat.dark, 0, 0.09, 0, 0.11, 0.025, 0.11, round);
     } else add(item, [12, 16, 17].includes(id) ? mat.paper : mat.amber, 0, 0, 0, 0.34, 0.055, 0.22);
     items.set(id, item);
-    const clue = site.clue;
-    block(mat.dark, clue.x, clue.y, clue.z - 0.04, 0.9, 0.64, 0.07);
-    sign('ЗАПИСЬ ТЕЛЕФОНИСТКИ', mission.clue, clue.x, clue.y, clue.z, 0.86, 0.6, 0, 'paper');
+    mountDocument(site.clue, 'ЗАПИСЬ ТЕЛЕФОНИСТКИ', mission.clue);
     const s = site.station;
     if (id !== 11) {
       block(mat.paint, s.x, 0.56, s.z - 0.18, 1.3, 1.12, 0.65);
@@ -134,7 +132,7 @@ export function buildSignalHouse({group, mat, box, round, plane, block, mesh, si
     const face = id === 11 ? null : new THREE.MeshBasicMaterial({color: 0xa57e58});
     if (id !== 11) {
       mesh(plane, face, s.x, s.y, s.z + 0.21, 0.83, 0.4, 1);
-      sign(mission.station.toUpperCase(), 'ДОМ СВЯЗИ / ' + id, s.x, 2.1, s.z - 0.12, 1.8, 0.37);
+      instrumentLabel(mission.station.toUpperCase(), 'ДОМ СВЯЗИ / ' + id, s.x, 2.1, s.z - 0.12, 1.8, 0.37);
     }
     const changed = new THREE.Group();
     changed.position.set(s.x, s.y, s.z + (id === 18 ? 0.35 : 0.24));

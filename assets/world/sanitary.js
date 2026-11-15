@@ -217,6 +217,8 @@ export function buildSanitaryFloor({
   solid,
   at,
   table,
+  document: mountDocument,
+  instrumentLabel,
 }) {
   const items = new Map(),
     stations = new Map();
@@ -275,18 +277,7 @@ export function buildSanitaryFloor({
       add(item, mat.dark, 0, 0.08, 0, 0.17, 0.03, 0.1);
     }
     items.set(id, item);
-    block(mat.dark, site.clue.x, site.clue.y, site.clue.z - 0.04, 0.9, 0.64, 0.07);
-    sign(
-      'ЗАПИСЬ ЛИДИИ СЕРГЕЕВНЫ',
-      mission.clue,
-      site.clue.x,
-      site.clue.y,
-      site.clue.z,
-      0.86,
-      0.6,
-      0,
-      'paper',
-    );
+    mountDocument(site.clue, 'ЗАПИСЬ ЛИДИИ СЕРГЕЕВНЫ', mission.clue);
     const special = id === 41 || id === 42,
       width = id === 42 ? 1.9 : 1.3;
     if (id !== 41) {
@@ -294,7 +285,7 @@ export function buildSanitaryFloor({
       solid(s.x, s.z - 0.18, width, 0.65);
       block(mat.steel, s.x, 1.15, s.z - 0.12, width + 0.1, 0.08, 0.8);
     }
-    sign(
+    instrumentLabel(
       mission.station.toUpperCase(),
       'САНИТАРНЫЙ ЭТАЖ / ' + id,
       s.x,

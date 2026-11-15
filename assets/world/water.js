@@ -156,6 +156,8 @@ export function buildWaterWorks({
   solid,
   at,
   table,
+  document: mountDocument,
+  instrumentLabel,
 }) {
   const items = new Map(),
     stations = new Map(),
@@ -217,28 +219,17 @@ export function buildWaterWorks({
       add(item, mat.dark, 0, 0.075, 0, 0.22, 0.03, 0.1);
     }
     items.set(id, item);
-    block(mat.dark, site.clue.x, site.clue.y, site.clue.z - 0.04, 0.9, 0.64, 0.07);
-    sign(
-      'ЗАПИСЬ ВОДОМЕРЩИКА',
-      mission.clue,
-      site.clue.x,
-      site.clue.y,
-      site.clue.z,
-      0.86,
-      0.6,
-      0,
-      'paper',
-    );
+    mountDocument(site.clue, 'ЗАПИСЬ ВОДОМЕРЩИКА', mission.clue);
     const special = WATER_MODES.includes(id),
       width = id === 31 ? 2.25 : 1.35;
     block(mat.paint, s.x, 0.56, s.z - 0.18, width, 1.12, 0.65);
     solid(s.x, s.z - 0.18, width, 0.65);
     block(mat.steel, s.x, 1.15, s.z - 0.12, width + 0.1, 0.08, 0.8);
-    sign(
+    instrumentLabel(
       mission.station.toUpperCase(),
       'ВОДОМЕРНЫЙ УЗЕЛ / ' + id,
       s.x,
-      2.3,
+      2.4,
       s.z - 0.12,
       width + 0.4,
       0.36,
