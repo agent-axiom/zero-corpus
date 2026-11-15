@@ -6,6 +6,7 @@ import {CHAPTER_SITES} from './chapter.js';
 import {SIGNAL_BOARD, SIGNAL_SITES} from './signals.js';
 import {ARCHIVE_CAROUSEL, ARCHIVE_SITES} from './archive.js';
 import {WATER_SITES} from './water.js';
+import {SANITARY_SITES} from './sanitary.js';
 
 function shade(rgb, light) {
   const word = Math.min(255, rgb[0] * light) | (Math.min(255, rgb[1] * light) << 8) | (Math.min(255, rgb[2] * light) << 16);
@@ -234,7 +235,7 @@ export function softwareView(canvas) {
       }
       for (const [id, station] of chapter.stations) {
         const p = station.point,
-          site = CHAPTER_SITES[id] || SIGNAL_SITES[id] || ARCHIVE_SITES[id] || WATER_SITES[id],
+          site = CHAPTER_SITES[id] || SIGNAL_SITES[id] || ARCHIVE_SITES[id] || WATER_SITES[id] || SANITARY_SITES[id],
           item = chapter.items.get(id);
         if (id !== 9) {
           sprite(p.x, 0.03, p.z - 0.17, 1.18, 1.1, '#505d4c');
@@ -253,7 +254,17 @@ export function softwareView(canvas) {
         if (item?.visible && id !== 3)
           sprite(site.item.x, site.item.y, site.item.z, 0.3, 0.11, id === 9 ? '#454431' : '#d5b47c');
         if (station.changed.visible) sprite(p.x, p.y - 0.04, p.z + 0.24, 0.4, 0.06, '#dccb92');
-        if (station.texture) sprite(p.x,1.2,p.z+.25,id===31?2.13:1.23,.82,'#213c36','',station.texture.image);
+        if (station.texture) sprite(p.x,id===42?1.0:1.2,p.z+.25,id===31?2.13:id===42?1.8:1.23,id===42?1:.82,'#213c36','',station.texture.image);
+      }
+      if (chapter.sanitaryWing) {
+        sprite(-6.5,.02,-11.6,1.25,2.2,'#c1c7ab',chapter.completed>=41?'ШКАФ ОТКРЫТ':'НАБЛЮДЕНИЯ');
+        sprite(5.5,.4,-23.2,1.3,.4,'#a4b69b','ПУСТАЯ КОЙКА');
+        sprite(7.95,1.94,-23.3,.08,.08,'#'+chapter.pulseLamp.color.getHexString());
+        sprite(7.6,1.475,-23.3,.98,.35,'#1c3427','',chapter.pulseTexture.image);
+        if(chapter.decoded.visible) sprite(-10.1,1.55,-25.42,.65,.3,'#d4cdb0','ЦЕХ');
+        if(chapter.projection.visible) sprite(3.8,1.45,-26.2,1.2,.7,'#52745a','НИНА ВЫШЛА');
+        if(chapter.completed>=48) sprite(7.5,.49,-20.82,1.1,.38,'#babfa2','ЛИЧНАЯ КАРТА');
+        if(chapter.dispatchKey.visible) sprite(0,1.2,-38.77,.35,.05,'#d4c08f','КЛЮЧ');
       }
       if (chapter.waterWing) {
         if(chapter.flooded) sprite(0,.018,-23.8,3.2,.06,'#547c76');

@@ -7,6 +7,7 @@ import {ARCHIVE_DOOR, CHAPTER_SITES, EXIT_Z, restoreChapter} from './assets/worl
 import {SIGNAL_BOARD, SIGNAL_SITES, restoreSignals} from './assets/world/signals.js';
 import {ARCHIVE_CAROUSEL, ARCHIVE_SITES, restoreArchive} from './assets/world/archive.js';
 import {WATER_SITES, restoreWater} from './assets/world/water.js';
+import {SANITARY_SITES, restoreSanitary} from './assets/world/sanitary.js';
 
 const EYE_HEIGHT = 1.62;
 const BODY_RADIUS = .24;
@@ -338,7 +339,7 @@ export function createWorld(container, callbacks = {}) {
     for (let i = 0; i < steps && life === 'running'; i++) {
       updateGate(dt / steps); move(dt / steps); updateHazard(dt / steps);
     }
-    const exitReady = layout.opening ? chapterState.relayReleased : (layout.signalHouse || layout.archiveWing || layout.waterWing) && chapterState.exitReleased;
+    const exitReady = layout.opening ? chapterState.relayReleased : (layout.signalHouse || layout.archiveWing || layout.waterWing || layout.sanitaryWing) && chapterState.exitReleased;
     if (exitReady && camera.position.z < EXIT_Z - .9) {
       callbacks.onChapterExit?.();
       return;
@@ -372,6 +373,11 @@ export function createWorld(container, callbacks = {}) {
   function syncChapter(instant = false) {
     if (!facility.chapterScene) return;
     facility.chapterScene.apply(chapterCompleted, chapterState, layout.id, collected, instant);
+    if (layout.sanitaryWing) {
+      facility.item.visible = false;
+      if (layout.id >= 43) layout.points.spirograph = SANITARY_SITES[42].station;
+      return;
+    }
     if (layout.waterWing) {
       facility.item.visible = false;
       if (layout.id !== 31) layout.points.hydraulics = WATER_SITES[31].station;
@@ -393,13 +399,13 @@ export function createWorld(container, callbacks = {}) {
     delete layout.points.door;
     if (layout.id >= 3 && !chapterState.archiveOpen) layout.points.door = ARCHIVE_DOOR;
   }
-  function start(mission, {encounterPassed = false, chapter = null, signals = null, archive = null, water = null, completed = mission.id - 1} = {}) {
+  function start(mission, {encounterPassed = false, chapter = null, signals = null, archive = null, water = null, sanitary = null, completed = mission.id - 1} = {}) {
     if (disposed) return;
     pause(); clearLevel();
     layout = layoutFor(mission.id);
     chapterCompleted = completed;
-    restoreState = [restoreChapter, restoreSignals, restoreArchive, restoreWater][layout.chapter] || restoreChapter;
-    chapterState = restoreState([chapter, signals, archive, water][layout.chapter], completed);
+    restoreState = [restoreChapter, restoreSignals, restoreArchive, restoreWater, restoreSanitary][layout.chapter] || restoreChapter;
+    chapterState = restoreState([chapter, signals, archive, water, sanitary][layout.chapter], completed);
     firstEncounter = mission.id === 3 ? createFirstEncounter(encounterPassed) : null;
     facility = buildFacility(mission, layout);
     facility.repair?.setPhase(firstEncounter?.phase ?? 'passed', 0);
@@ -413,7 +419,7 @@ export function createWorld(container, callbacks = {}) {
     camera.position.set(0, EYE_HEIGHT, spawnZ); camera.rotation.set(-.012, 0, 0, 'YXZ');
     collected = false; walkTime = 0; stepTime = .28; roomTime = 0;
     hazardTime = 0; hazardPhase = 'idle'; warningLight.intensity = 0;
-    patrolOrigin = layout.opening ? POST.spawnZ + 1.85 : (layout.signalHouse || layout.archiveWing || layout.waterWing) ? -36.8 : -layout.end * CELL;
+    patrolOrigin = layout.opening ? POST.spawnZ + 1.85 : (layout.signalHouse || layout.archiveWing || layout.waterWing || layout.sanitaryWing) ? -36.8 : -layout.end * CELL;
     nextHazard = 43 - layout.chapter; patrolLength = (1.75 - patrolOrigin) / 2.05;
     syncChapter(true);
     const pose = facility.chapterScene && chapterState.pose;
@@ -503,6 +509,11 @@ export function createWorld(container, callbacks = {}) {
       };
       if (layout.id === 17) return {
         item: 'Кабины связи', clue: 'Схема кросса в коридоре', station: 'Разделительный кросс в коридоре',
+      };
+      if (SANITARY_SITES[layout.id]) return {
+        item: layout.id === 50 ? 'Изолятор, ящик личной карты Нины' : SANITARY_SITES[layout.id].room,
+        clue: layout.id === 50 ? 'Инструкция у пневмопочты в конце коридора' : SANITARY_SITES[layout.id].room,
+        station: layout.id === 50 ? 'Пневматический отправитель перед выходом' : SANITARY_SITES[layout.id].room,
       };
       if (WATER_SITES[layout.id]) return {
         item: layout.id === 40 ? 'Дренаж, стол у сушилки' : WATER_SITES[layout.id].room,
